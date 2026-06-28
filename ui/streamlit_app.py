@@ -83,7 +83,7 @@ def _inject_global_styles() -> None:
             --rn-red: #b91c1c;
         }
         .block-container {
-            padding-top: 1.6rem;
+            padding-top: 0.9rem;
             padding-bottom: 3rem;
             max-width: 1380px;
         }
@@ -112,9 +112,9 @@ def _inject_global_styles() -> None:
             border: 1px solid var(--rn-line);
             border-left: 5px solid var(--rn-blue);
             border-radius: 8px;
-            padding: 22px 24px;
+            padding: 14px 18px;
             background: linear-gradient(90deg, #ffffff 0%, #f8fbff 100%);
-            margin-bottom: 18px;
+            margin-bottom: 10px;
         }
         .rn-hero-top {
             display: flex;
@@ -124,23 +124,23 @@ def _inject_global_styles() -> None:
             flex-wrap: wrap;
         }
         .rn-title {
-            font-size: 2.05rem;
+            font-size: 1.58rem;
             line-height: 1.15;
             font-weight: 760;
-            margin: 0 0 6px;
+            margin: 0 0 4px;
             color: var(--rn-ink);
         }
         .rn-subtitle {
             color: var(--rn-muted);
-            font-size: 1.02rem;
+            font-size: 0.93rem;
             max-width: 780px;
             margin: 0;
         }
         .rn-pill-row {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
-            margin-top: 14px;
+            margin-top: 8px;
         }
         .rn-pill {
             display: inline-flex;
@@ -148,10 +148,10 @@ def _inject_global_styles() -> None:
             gap: 6px;
             border: 1px solid var(--rn-line);
             border-radius: 999px;
-            padding: 5px 10px;
+            padding: 3px 8px;
             background: #ffffff;
             color: #334155;
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             font-weight: 650;
             white-space: nowrap;
         }
@@ -166,11 +166,11 @@ def _inject_global_styles() -> None:
             background: #fffbeb;
         }
         .rn-hero-score {
-            min-width: 210px;
+            min-width: 190px;
             border: 1px solid var(--rn-line);
             border-radius: 8px;
             background: #ffffff;
-            padding: 12px 14px;
+            padding: 9px 11px;
         }
         .rn-score-label {
             color: var(--rn-muted);
@@ -181,7 +181,7 @@ def _inject_global_styles() -> None:
         }
         .rn-score-value {
             color: var(--rn-ink);
-            font-size: 1.35rem;
+            font-size: 1.05rem;
             font-weight: 760;
             line-height: 1.1;
         }
@@ -193,15 +193,15 @@ def _inject_global_styles() -> None:
         .rn-metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-            margin: 14px 0 20px;
+            gap: 10px;
+            margin: 10px 0 14px;
         }
         .rn-metric-card {
             border: 1px solid var(--rn-line);
             border-radius: 8px;
             background: var(--rn-panel);
-            padding: 14px 15px;
-            min-height: 86px;
+            padding: 10px 12px;
+            min-height: 68px;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
         .rn-metric-label {
@@ -209,14 +209,41 @@ def _inject_global_styles() -> None:
             font-size: 0.76rem;
             font-weight: 700;
             text-transform: uppercase;
-            margin-bottom: 7px;
+            margin-bottom: 4px;
         }
         .rn-metric-value {
             color: var(--rn-ink);
-            font-size: 1.36rem;
+            font-size: 1.08rem;
             font-weight: 760;
             line-height: 1.15;
             overflow-wrap: anywhere;
+        }
+        .rn-status-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0 10px;
+        }
+        .rn-status-chip {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 6px;
+            border: 1px solid var(--rn-line);
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 6px 9px;
+            min-height: 34px;
+        }
+        .rn-status-label {
+            color: var(--rn-muted);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .rn-status-value {
+            color: var(--rn-ink);
+            font-size: 0.92rem;
+            font-weight: 760;
         }
         .rn-section {
             margin-top: 6px;
@@ -254,8 +281,8 @@ def _inject_global_styles() -> None:
             border-left: 4px solid var(--rn-amber);
             border-radius: 8px;
             background: #fffbeb;
-            padding: 13px 15px;
-            margin: 4px 0 18px;
+            padding: 9px 11px;
+            margin: 4px 0 10px;
             color: #1f2937;
         }
         .rn-review-banner.fail {
@@ -266,18 +293,18 @@ def _inject_global_styles() -> None:
         .rn-review-title {
             font-weight: 760;
             color: var(--rn-ink);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
         .rn-review-text {
             color: #4b5563;
-            font-size: 0.92rem;
-            margin-bottom: 6px;
+            font-size: 0.88rem;
+            margin-bottom: 4px;
         }
         .rn-review-banner ul {
-            margin: 6px 0 0 18px;
+            margin: 4px 0 0 18px;
             padding: 0;
             color: #374151;
-            font-size: 0.9rem;
+            font-size: 0.84rem;
         }
         .rn-result-meta {
             color: var(--rn-muted);
@@ -291,6 +318,89 @@ def _inject_global_styles() -> None:
             font-size: 0.76rem;
             font-weight: 700;
             text-transform: uppercase;
+        }
+        div[data-testid="stTabs"] div[role="tablist"] {
+            gap: 4px;
+            flex-wrap: wrap;
+            overflow-x: visible;
+        }
+        div[data-testid="stTabs"] button[role="tab"] {
+            min-height: 2.15rem;
+            padding: 0.35rem 0.55rem;
+            border-radius: 6px 6px 0 0;
+        }
+        div[data-testid="stTabs"] button[role="tab"] p {
+            white-space: normal;
+        }
+        @media (max-width: 700px) {
+            .block-container {
+                padding: 0.65rem 0.65rem 2rem;
+            }
+            .rn-hero {
+                padding: 11px 12px;
+                margin-bottom: 8px;
+            }
+            .rn-hero-top {
+                gap: 8px;
+            }
+            .rn-title {
+                font-size: 1.28rem;
+            }
+            .rn-subtitle {
+                font-size: 0.84rem;
+            }
+            .rn-pill-row {
+                display: none;
+            }
+            .rn-hero-score {
+                min-width: 0;
+                width: 100%;
+                padding: 8px 9px;
+            }
+            .rn-score-label,
+            .rn-score-note {
+                font-size: 0.7rem;
+            }
+            .rn-score-value {
+                font-size: 0.95rem;
+            }
+            .rn-status-strip {
+                gap: 6px;
+                margin: 6px 0 8px;
+            }
+            .rn-status-chip {
+                flex: 1 1 46%;
+                min-width: 0;
+                padding: 5px 7px;
+            }
+            .rn-status-label {
+                font-size: 0.66rem;
+            }
+            .rn-status-value {
+                font-size: 0.82rem;
+            }
+            .rn-review-banner {
+                padding: 8px 9px;
+            }
+            .rn-review-banner ul {
+                display: none;
+            }
+            div[data-testid="stTabs"] div[role="tablist"] {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 4px;
+            }
+            div[data-testid="stTabs"] button[role="tab"] {
+                width: 100%;
+                min-width: 0;
+                min-height: 2rem;
+                padding: 0.28rem 0.25rem;
+                justify-content: center;
+            }
+            div[data-testid="stTabs"] button[role="tab"] p {
+                font-size: 0.74rem;
+                line-height: 1.05;
+            }
         }
         </style>
         """,
@@ -332,6 +442,26 @@ def _render_header(counts: dict, evaluation: dict) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def _render_status_strip(counts: dict, evaluation: dict) -> None:
+    status = evaluation_status_summary(evaluation)
+    items = [
+        ("Papers", counts.get("papers", 0)),
+        ("Statements", counts.get("statements", 0)),
+        ("Gaps / Hypotheses", f"{counts.get('gaps', 0)} / {counts.get('hypotheses', 0)}"),
+        ("Grounding", counts.get("grounding_score", "n/a")),
+        ("Evaluation", status["headline"]),
+    ]
+    chips = []
+    for label, value in items:
+        chips.append(
+            '<span class="rn-status-chip">'
+            f'<span class="rn-status-label">{html.escape(str(label))}</span>'
+            f'<span class="rn-status-value">{html.escape(_format_display_value(value))}</span>'
+            "</span>"
+        )
+    st.markdown(f'<div class="rn-status-strip">{"".join(chips)}</div>', unsafe_allow_html=True)
 
 
 def evaluation_status_summary(evaluation: dict | None) -> dict[str, object]:
@@ -1141,6 +1271,96 @@ def _graph_node_color(node_type: str) -> str:
     }.get(node_type, "#334155")
 
 
+def _render_search_workspace(
+    data: dict,
+    evaluation: dict,
+    default_search_query: str,
+    max_search_results: int,
+) -> None:
+    _section_header(
+        "Search the local research corpus",
+        "Results are ranked across papers, statements, gaps, hypotheses, and experiment plans.",
+        "Discovery",
+    )
+    if "search_query" not in st.session_state:
+        st.session_state["search_query"] = default_search_query
+    paper_options = ["all"] + sorted(
+        str(item)
+        for item in data["papers"].get("paper_id", pd.Series(dtype=str)).dropna().unique()
+    )
+    with st.form("search_controls"):
+        search_cols = st.columns([5, 1])
+        query = search_cols[0].text_input(
+            "Research question or keyword",
+            placeholder="Find research gaps related to evaluation of AI-generated hypotheses",
+            key="search_query",
+        )
+        search_submitted = search_cols[1].form_submit_button("Search", type="primary")
+        filter_cols = st.columns(4)
+        statement_type = filter_cols[0].selectbox("Statement type", STATEMENT_TYPES)
+        result_type = filter_cols[1].selectbox("Result type", RESULT_TYPES)
+        safety_threshold = filter_cols[2].slider(
+            "Global safety warning threshold",
+            0.0,
+            1.0,
+            0.0,
+            0.1,
+            help=(
+                "Compares against evaluation_report.safety_score; search results do not "
+                "have per-result safety scores."
+            ),
+        )
+        paper_id = filter_cols[3].selectbox("Paper", paper_options)
+
+    safety_message = _global_safety_threshold_message(evaluation, safety_threshold)
+    if safety_message:
+        tone, message = safety_message
+        if tone == "warning":
+            st.warning(message)
+        else:
+            st.info(message)
+
+    if search_submitted:
+        results_by_type = search_all(
+            query,
+            data,
+            {
+                "statement_type": statement_type,
+                "result_type": result_type,
+                "paper_id": paper_id,
+            },
+        )
+        all_results = _flatten_results(results_by_type, query)
+        results, limit_message = _limit_search_results(all_results, max_search_results)
+        st.session_state["last_search_query"] = query
+        st.session_state["last_search_results"] = results
+        st.session_state["last_search_limit_message"] = limit_message
+
+    active_query = st.session_state.get("last_search_query", "")
+    results = st.session_state.get("last_search_results", [])
+    limit_message = st.session_state.get("last_search_limit_message")
+    if str(active_query).strip():
+        _discovery_summary(results)
+        if limit_message:
+            st.caption(limit_message)
+        if not results:
+            st.info("No local matches found. Try a broader keyword or run the processing pipeline.")
+        for result_index, result in enumerate(results):
+            _result_card(result, data, result_index)
+    else:
+        st.markdown(
+            """
+            <div class="rn-callout">
+              <strong>Example searches</strong><br>
+              What are the limitations of AI systems for scientific discovery?<br>
+              Which papers discuss automated hypothesis generation?<br>
+              Find research gaps related to evaluation of AI-generated hypotheses.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def main() -> None:
     st.set_page_config(page_title="ResearchNavigator Agent", layout="wide")
     _inject_global_styles()
@@ -1159,28 +1379,40 @@ def main() -> None:
     counts = dashboard_counts(processed_data, graph, discovery, evaluation)
 
     _render_header(counts, evaluation)
-    _metric_cards(
-        [
-            ("Papers", counts["papers"]),
-            ("Chunks", counts["chunks"]),
-            ("Statements", counts["statements"]),
-            ("Graph nodes", counts["graph_nodes"]),
-            ("Graph edges", counts["graph_edges"]),
-            ("Gaps", counts["gaps"]),
-            ("Hypotheses", counts["hypotheses"]),
-            ("Grounding", counts["grounding_score"]),
-        ],
-        columns=4,
-    )
-    _render_evaluation_caveats(evaluation)
+    _render_status_strip(counts, evaluation)
 
     if not DEFAULT_DB_PATH.exists():
         _show_pipeline_instructions()
 
-    tabs = st.tabs(
+    _render_search_workspace(data, evaluation, default_search_query, max_search_results)
+    with st.expander("Project metrics", expanded=False):
+        _metric_cards(
+            [
+                ("Papers", counts["papers"]),
+                ("Chunks", counts["chunks"]),
+                ("Statements", counts["statements"]),
+                ("Graph nodes", counts["graph_nodes"]),
+                ("Graph edges", counts["graph_edges"]),
+                ("Gaps", counts["gaps"]),
+                ("Hypotheses", counts["hypotheses"]),
+                ("Grounding", counts["grounding_score"]),
+            ],
+            columns=4,
+        )
+    _render_evaluation_caveats(evaluation)
+
+    (
+        corpus_tab,
+        evidence_tab,
+        discoveries_tab,
+        themes_tab,
+        graph_tab,
+        report_tab,
+        safety_tab,
+        pipeline_tab,
+    ) = st.tabs(
         [
             "Corpus Setup",
-            "Search",
             "Evidence Inspector",
             "Discoveries",
             "Research Themes",
@@ -1191,93 +1423,10 @@ def main() -> None:
         ]
     )
 
-    with tabs[0]:
+    with corpus_tab:
         _render_corpus_setup()
 
-    with tabs[1]:
-        _section_header(
-            "Search the local research corpus",
-            "Results are ranked across papers, statements, gaps, hypotheses, and experiment plans.",
-            "Discovery",
-        )
-        if "search_query" not in st.session_state:
-            st.session_state["search_query"] = default_search_query
-        paper_options = ["all"] + sorted(
-            str(item)
-            for item in data["papers"].get("paper_id", pd.Series(dtype=str)).dropna().unique()
-        )
-        with st.form("search_controls"):
-            query = st.text_input(
-                "Research question or keyword",
-                placeholder="Find research gaps related to evaluation of AI-generated hypotheses",
-                key="search_query",
-            )
-            filter_cols = st.columns(4)
-            statement_type = filter_cols[0].selectbox("Statement type", STATEMENT_TYPES)
-            result_type = filter_cols[1].selectbox("Result type", RESULT_TYPES)
-            safety_threshold = filter_cols[2].slider(
-                "Global safety warning threshold",
-                0.0,
-                1.0,
-                0.0,
-                0.1,
-                help=(
-                    "Compares against evaluation_report.safety_score; search results do not "
-                    "have per-result safety scores."
-                ),
-            )
-            paper_id = filter_cols[3].selectbox("Paper", paper_options)
-            search_submitted = st.form_submit_button("Search", type="primary")
-
-        safety_message = _global_safety_threshold_message(evaluation, safety_threshold)
-        if safety_message:
-            tone, message = safety_message
-            if tone == "warning":
-                st.warning(message)
-            else:
-                st.info(message)
-
-        if search_submitted:
-            results_by_type = search_all(
-                query,
-                data,
-                {
-                    "statement_type": statement_type,
-                    "result_type": result_type,
-                    "paper_id": paper_id,
-                },
-            )
-            all_results = _flatten_results(results_by_type, query)
-            results, limit_message = _limit_search_results(all_results, max_search_results)
-            st.session_state["last_search_query"] = query
-            st.session_state["last_search_results"] = results
-            st.session_state["last_search_limit_message"] = limit_message
-
-        active_query = st.session_state.get("last_search_query", "")
-        results = st.session_state.get("last_search_results", [])
-        limit_message = st.session_state.get("last_search_limit_message")
-        if str(active_query).strip():
-            _discovery_summary(results)
-            if limit_message:
-                st.caption(limit_message)
-            if not results:
-                st.info("No local matches found. Try a broader keyword or run the processing pipeline.")
-            for result_index, result in enumerate(results):
-                _result_card(result, data, result_index)
-        else:
-            st.markdown(
-                """
-                <div class="rn-callout">
-                  <strong>Example searches</strong><br>
-                  What are the limitations of AI systems for scientific discovery?<br>
-                  Which papers discuss automated hypothesis generation?<br>
-                  Find research gaps related to evaluation of AI-generated hypotheses.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    with tabs[2]:
+    with evidence_tab:
         _section_header(
             "Evidence inspector",
             "Review source statements, compact evidence snippets, quality signals, and linked discoveries.",
@@ -1351,7 +1500,7 @@ def main() -> None:
             with st.expander("Linked details"):
                 st.json(related)
 
-    with tabs[3]:
+    with discoveries_tab:
         _metric_cards(
             [
                 ("Papers", counts["papers"]),
@@ -1404,7 +1553,7 @@ def main() -> None:
                     if plans:
                         st.json(plans[0].get("plan", {}))
 
-    with tabs[4]:
+    with themes_tab:
         _section_header(
             "Research themes",
             "Deterministic clusters from recurring statement keywords and graph coverage.",
@@ -1422,7 +1571,7 @@ def main() -> None:
             st.markdown("#### Representative evidence")
             _render_dataframe(pd.DataFrame(evidence))
 
-    with tabs[5]:
+    with graph_tab:
         search_results = st.session_state.get("last_search_results", [])
         subgraph = _subgraph_for_results(graph, search_results) if search_results else build_small_subgraph(graph)
         _section_header(
@@ -1433,7 +1582,7 @@ def main() -> None:
         st.json(graph_summary(subgraph))
         _render_graph(subgraph)
 
-    with tabs[6]:
+    with report_tab:
         _section_header("Exportable research brief", "A local Markdown brief generated from current artifacts.", "Report")
         brief = create_research_brief(data)
         st.download_button(
@@ -1444,7 +1593,7 @@ def main() -> None:
         )
         st.code(brief, language="markdown")
 
-    with tabs[7]:
+    with safety_tab:
         if not evaluation:
             status = evaluation_status_summary(evaluation)
             _section_header(
@@ -1487,7 +1636,7 @@ def main() -> None:
                     "No deterministic safety failures detected; generated hypotheses remain speculative."
                 )
 
-    with tabs[8]:
+    with pipeline_tab:
         agent_story = describe_agent_capabilities()
         trajectory = planned_tool_trajectory()
         _section_header("ADK agent view", "Local Google ADK-facing wrapper over deterministic research tools.", "Agent")
