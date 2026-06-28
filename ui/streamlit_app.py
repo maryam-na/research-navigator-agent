@@ -244,6 +244,36 @@ def _inject_global_styles() -> None:
             margin: 10px 0 16px;
             color: #1f2937;
         }
+        .rn-review-banner {
+            border: 1px solid #fde68a;
+            border-left: 4px solid var(--rn-amber);
+            border-radius: 8px;
+            background: #fffbeb;
+            padding: 13px 15px;
+            margin: 4px 0 18px;
+            color: #1f2937;
+        }
+        .rn-review-banner.fail {
+            border-color: #fecaca;
+            border-left-color: var(--rn-red);
+            background: #fff7f7;
+        }
+        .rn-review-title {
+            font-weight: 760;
+            color: var(--rn-ink);
+            margin-bottom: 4px;
+        }
+        .rn-review-text {
+            color: #4b5563;
+            font-size: 0.92rem;
+            margin-bottom: 6px;
+        }
+        .rn-review-banner ul {
+            margin: 6px 0 0 18px;
+            padding: 0;
+            color: #374151;
+            font-size: 0.9rem;
+        }
         .rn-result-meta {
             color: var(--rn-muted);
             font-size: 0.82rem;
@@ -270,11 +300,9 @@ def _format_display_value(value: object) -> str:
 
 
 def _render_header(counts: dict, evaluation: dict) -> None:
-    safety = _format_display_value(evaluation.get("safety_score", "n/a"))
-    grounding = _format_display_value(evaluation.get("grounding_score", "n/a"))
-    failed_checks = len(evaluation.get("failed_checks", [])) if isinstance(evaluation, dict) else 0
-    safety_class = "good" if failed_checks == 0 else "warn"
-    status_text = "Safety checks passed" if failed_checks == 0 else "Safety review needed"
+    status = evaluation_status_summary(evaluation)
+    safety = status["safety_label"]
+    grounding = status["grounding_label"]
     st.markdown(
         f"""
         <div class="rn-hero">
@@ -286,15 +314,146 @@ def _render_header(counts: dict, evaluation: dict) -> None:
                 <span class="rn-pill good">Local-first</span>
                 <span class="rn-pill good">Google ADK-facing</span>
                 <span class="rn-pill good">Evidence-linked</span>
-                <span class="rn-pill {safety_class}">{html.escape(status_text)}</span>
+                <span class="rn-pill {status["tone"]}">{html.escape(status["pill_text"])}</span>
               </div>
             </div>
             <div class="rn-hero-score">
               <div class="rn-score-label">Evaluation</div>
-              <div class="rn-score-value">Safety {html.escape(safety)}</div>
-              <div class="rn-score-note">Grounding {html.escape(grounding)} | {counts.get("statements", 0)} statements</div>
+              <div class="rn-score-value">{html.escape(status["headline"])}</div>
+              <div class="rn-score-note">Safety {html.escape(safety)} | Grounding {html.escape(grounding)} | {counts.get("statements", 0)} statements</div>
             </div>
           </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def evaluation_status_summary(evaluation: dict | None) -> dict[str, object]:
+    """Classify evaluation display state without implying scientific proof."""
+
+    if not evaluation:
+        return {
+            "key": "missing",
+            "tone": "warn",
+            "pill_text": "Evaluation pending",
+            "headline": "Evaluation pending",
+            "summary": "Run the local evaluation before treating generated outputs as reviewed.",
+            "safety_label": "n/a",
+            "grounding_label": "n/a",
+            "failed_count": 0,
+            "warning_count": 0,
+            "has_grounding_caveat": False,
+        }
+
+    failed_count = len(evaluation.get("failed_checks", []) or [])
+    warnings = _evaluation_warnings(evaluation)
+    grounding_score = _score_to_float(evaluation.get("grounding_score"))
+    has_grounding_caveat = grounding_score is not None and grounding_score < 1.0
+    base = {
+        "safety_label": _format_display_value(evaluation.get("safety_score", "n/a")),
+        "grounding_label": _format_display_value(evaluation.get("grounding_score", "n/a")),
+        "failed_count": failed_count,
+        "warning_count": len(warnings),
+        "has_grounding_caveat": has_grounding_caveat,
+    }
+    if failed_count:
+        return {
+            **base,
+            "key": "failed",
+            "tone": "warn",
+            "pill_text": "Safety review needed",
+            "headline": "Safety review needed",
+            "summary": (
+                f"{failed_count} deterministic check{'s' if failed_count != 1 else ''} "
+                "need review before using generated outputs."
+            ),
+        }
+    if warnings or has_grounding_caveat:
+        return {
+            **base,
+            "key": "caveats",
+            "tone": "warn",
+            "pill_text": "Review caveats",
+            "headline": "Checks passed with caveats",
+            "summary": (
+                "No deterministic safety failures were found, but grounding and evaluator "
+                "caveats still need human review; hypotheses remain speculative."
+            ),
+        }
+    return {
+        **base,
+        "key": "passed",
+        "tone": "good",
+        "pill_text": "Checks passed",
+        "headline": "Checks passed",
+        "summary": "No deterministic safety failures or evaluator caveats were found.",
+    }
+
+
+def _evaluation_warnings(evaluation: dict | None) -> list[dict[str, str]]:
+    if not evaluation:
+        return []
+    raw_warnings = list(evaluation.get("warnings", []) or [])
+    metric_details = evaluation.get("metric_details", {})
+    if isinstance(metric_details, dict):
+        raw_warnings.extend(metric_details.get("warnings", []) or [])
+    warnings = []
+    seen: set[tuple[str, str]] = set()
+    for warning in raw_warnings:
+        if isinstance(warning, dict):
+            level = str(warning.get("level", "warning"))
+            message = str(warning.get("message", "")).strip()
+        else:
+            level = "warning"
+            message = str(warning).strip()
+        if not message:
+            continue
+        key = (level, message)
+        if key in seen:
+            continue
+        seen.add(key)
+        warnings.append({"level": level, "message": message})
+    return warnings
+
+
+def _evaluation_caveat_items(evaluation: dict | None) -> list[str]:
+    if not evaluation:
+        return ["Evaluation artifacts are missing; run the local evaluation command."]
+    items = []
+    grounding_score = _score_to_float(evaluation.get("grounding_score"))
+    if grounding_score is not None and grounding_score < 1.0:
+        items.append(
+            f"Grounding score is {_format_display_value(grounding_score)}; keep outputs tied to local evidence IDs."
+        )
+    for warning in _evaluation_warnings(evaluation):
+        items.append(warning["message"])
+    return items
+
+
+def _score_to_float(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _render_evaluation_caveats(evaluation: dict | None) -> None:
+    status = evaluation_status_summary(evaluation)
+    if status["key"] == "passed":
+        return
+    caveats = _evaluation_caveat_items(evaluation)
+    limited_items = caveats[:3]
+    if len(caveats) > len(limited_items):
+        limited_items.append(f"{len(caveats) - len(limited_items)} more caveat(s) in Safety & Evaluation.")
+    item_markup = "".join(f"<li>{html.escape(item)}</li>" for item in limited_items)
+    banner_class = "fail" if status["key"] == "failed" else "warn"
+    st.markdown(
+        f"""
+        <div class="rn-review-banner {banner_class}">
+          <div class="rn-review-title">{html.escape(str(status["headline"]))}</div>
+          <div class="rn-review-text">{html.escape(str(status["summary"]))}</div>
+          <ul>{item_markup}</ul>
         </div>
         """,
         unsafe_allow_html=True,
@@ -856,6 +1015,7 @@ def main() -> None:
         ],
         columns=4,
     )
+    _render_evaluation_caveats(evaluation)
 
     if not DEFAULT_DB_PATH.exists():
         _show_pipeline_instructions()
@@ -1059,11 +1219,21 @@ def main() -> None:
 
     with tabs[7]:
         if not evaluation:
+            status = evaluation_status_summary(evaluation)
+            _section_header(
+                f"Evaluation status: {status['headline']}",
+                str(status["summary"]),
+                "Evaluation",
+            )
             st.info("No evaluation report found. Run the evaluation command in Pipeline Trace.")
         else:
+            status = evaluation_status_summary(evaluation)
             failed_checks = evaluation.get("failed_checks", [])
-            status = "Passed" if not failed_checks and evaluation.get("safety_score", 0) >= 1.0 else "Needs review"
-            _section_header(f"Safety status: {status}", "Deterministic checks for grounding, safety, testability, and traceability.", "Evaluation")
+            _section_header(
+                f"Evaluation status: {status['headline']}",
+                str(status["summary"]),
+                "Evaluation",
+            )
             _metric_cards(
                 [
                     ("Overall", evaluation.get("overall_score", "n/a")),
@@ -1074,9 +1244,11 @@ def main() -> None:
                 ],
                 columns=5,
             )
-            warnings = evaluation.get("warnings", [])
+            warnings = _evaluation_warnings(evaluation)
             if warnings:
-                st.warning("The evaluator found caveats even if required checks passed.")
+                st.warning(
+                    "Review these caveats before treating generated gaps, hypotheses, or plans as reliable."
+                )
                 _render_dataframe(pd.DataFrame(warnings))
             with st.expander("Metric details"):
                 st.json(evaluation.get("metric_details", {}))
@@ -1084,7 +1256,9 @@ def main() -> None:
                 st.error("Failed checks require review.")
                 _render_dataframe(pd.DataFrame(failed_checks))
             else:
-                st.success("No deterministic safety failures detected.")
+                st.success(
+                    "No deterministic safety failures detected; generated hypotheses remain speculative."
+                )
 
     with tabs[8]:
         agent_story = describe_agent_capabilities()

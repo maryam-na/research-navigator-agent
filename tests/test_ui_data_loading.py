@@ -5,11 +5,13 @@ import networkx as nx
 from tools.graph_tools import export_graphml
 from tools.storage_tools import initialize_database, save_chunk, save_paper, save_statement
 from ui.streamlit_app import (
+    _evaluation_caveat_items,
     _render_dataframe,
     _render_plotly_chart,
     _subgraph_for_results,
     build_small_subgraph,
     dashboard_counts,
+    evaluation_status_summary,
     file_presence,
     graph_to_tables,
     load_graph,
@@ -143,6 +145,63 @@ def test_dashboard_counts_and_file_presence(tmp_path):
     assert counts["safety_score"] == 1.0
     assert presence.to_dict("records")[0]["present"] is True
     assert presence.to_dict("records")[1]["present"] is False
+
+
+def test_evaluation_status_distinguishes_caveats_from_pass():
+    evaluation = {
+        "safety_score": 1.0,
+        "grounding_score": 0.78,
+        "failed_checks": [],
+        "warnings": [
+            {"level": "info", "message": "Evidence currently comes from one paper or fewer."}
+        ],
+    }
+
+    status = evaluation_status_summary(evaluation)
+    caveats = _evaluation_caveat_items(evaluation)
+
+    assert status["key"] == "caveats"
+    assert status["headline"] == "Checks passed with caveats"
+    assert status["pill_text"] == "Review caveats"
+    assert status["tone"] == "warn"
+    assert caveats[0] == "Grounding score is 0.78; keep outputs tied to local evidence IDs."
+    assert "Evidence currently comes from one paper or fewer." in caveats
+
+
+def test_evaluation_status_handles_missing_and_failed_reports():
+    missing_status = evaluation_status_summary({})
+    failed_status = evaluation_status_summary(
+        {
+            "safety_score": 0.5,
+            "grounding_score": 0.9,
+            "failed_checks": [{"check": "grounding"}],
+            "warnings": [],
+        }
+    )
+
+    assert missing_status["key"] == "missing"
+    assert missing_status["headline"] == "Evaluation pending"
+    assert _evaluation_caveat_items({}) == [
+        "Evaluation artifacts are missing; run the local evaluation command."
+    ]
+    assert failed_status["key"] == "failed"
+    assert failed_status["headline"] == "Safety review needed"
+    assert failed_status["failed_count"] == 1
+
+
+def test_evaluation_status_passes_only_without_failures_warnings_or_grounding_caveat():
+    status = evaluation_status_summary(
+        {
+            "safety_score": 1.0,
+            "grounding_score": 1.0,
+            "failed_checks": [],
+            "warnings": [],
+        }
+    )
+
+    assert status["key"] == "passed"
+    assert status["headline"] == "Checks passed"
+    assert status["tone"] == "good"
 
 
 def test_load_json_file_reads_payload(tmp_path):
