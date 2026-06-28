@@ -1,0 +1,5 @@
+# Local ticket instances are private workspace state.
+tickets/*
+!tickets/
+!tickets/README.md
+!tickets/TEMPLATE.md

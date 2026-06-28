@@ -39,6 +39,21 @@ Read these files before changing behavior:
 - Keep NetworkX as the graph backend.
 - Prefer evidence IDs and compact snippets over copying long paper text.
 
+## Ticket Workflow
+
+- Local tickets live in `tickets/` as one Markdown file per ticket.
+- Ticket instance files and `tickets/INDEX.md` are local-only and must not be committed or pushed; `.gitignore` allows only the ticket README and template to be tracked.
+- Keep `tickets/INDEX.md` updated as the local overview of ticket ID, status, priority, title, and notes.
+- Use `tickets/TEMPLATE.md` for new tickets unless the user provides a different structure.
+- When the user says `implement ticket <ticket-id>`, first read the matching ticket file and the Source Of Truth files above.
+- Before implementation, create a new branch from local `main`.
+- Use a branch name that includes the ticket ID, such as `ticket/<ticket-id>-short-slug`.
+- Inspect the worktree before switching branches. Do not discard or overwrite uncommitted user changes; if they block creating the branch from `main`, stop and ask the user how to proceed.
+- Implement only the ticket scope unless the user expands it.
+- Run the relevant tests and visual checks listed in the ticket.
+- Commit the completed ticket changes to the ticket branch.
+- Update the ticket and `tickets/INDEX.md` with status, branch name, commit hash, checks run, and any remaining follow-up notes.
+
 ## Review Checklist
 
 - Does the change preserve local-only operation?
