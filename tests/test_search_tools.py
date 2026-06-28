@@ -381,6 +381,56 @@ def test_research_brief_contains_ranked_sections():
                 "hypothesis_text": "A controlled evaluation may clarify the limitation.",
                 "confidence_level": "low",
                 "safety_label": "speculative_research_hypothesis",
+                "evidence_statement_ids": ["stmt_limitation"],
+            }
+        ],
+        "evaluation": {
+            "overall_score": 0.8,
+            "grounding_score": 0.75,
+            "safety_score": 1.0,
+            "warnings": [
+                {"level": "warning", "message": "Evidence currently comes from one paper."}
+            ],
+            "failed_checks": [],
+        },
+        "graph": None,
+    }
+
+    brief = create_research_brief(data)
+
+    assert "# ResearchNavigator Local Brief" in brief
+    assert "## Evaluation Caveats" in brief
+    assert "## Ranked Research Gaps" in brief
+    assert "## Candidate Hypotheses (Speculative)" in brief
+    assert "gap_001" in brief
+    assert "hyp_001" in brief
+    assert "Evidence currently comes from one paper." in brief
+    assert "Grounding is below 1.0" in brief
+    assert "Evidence IDs: stmt_limitation" in brief
+    assert "Paper IDs: paper_001" in brief
+    assert "stmt_limitation (paper_001, limitation)" in brief
+    assert "speculative_research_hypothesis" in brief
+    assert "not as a proven claim" in brief
+
+
+def test_research_brief_marks_missing_evaluation_and_evidence():
+    data = {
+        "statements": sample_statements(),
+        "gaps": [
+            {
+                "gap_id": "gap_missing",
+                "gap_type": "limitation",
+                "gap_text": "A gap with stale evidence should still be labeled.",
+                "source_statement_ids": ["stmt_missing"],
+            }
+        ],
+        "hypotheses": [
+            {
+                "hypothesis_id": "hyp_missing",
+                "gap_id": "gap_missing",
+                "hypothesis_text": "A speculative follow-up may be possible.",
+                "confidence_level": "low",
+                "safety_label": "speculative_research_hypothesis",
             }
         ],
         "graph": None,
@@ -388,6 +438,7 @@ def test_research_brief_contains_ranked_sections():
 
     brief = create_research_brief(data)
 
-    assert "# ResearchNavigator Local Brief" in brief
-    assert "## Ranked Research Gaps" in brief
-    assert "gap_001" in brief
+    assert "Evaluation report is missing" in brief
+    assert "Evidence IDs: stmt_missing" in brief
+    assert "Source snippets: not available in the current statement table." in brief
+    assert "Linked gap evidence IDs: stmt_missing" in brief

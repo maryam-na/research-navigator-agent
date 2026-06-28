@@ -2299,7 +2299,7 @@ def main() -> None:
             file_name="researchnavigator_brief.md",
             mime="text/markdown",
         )
-        st.code(brief, language="markdown")
+        st.text_area("Markdown brief preview", value=brief, height=520, disabled=True)
 
     with safety_tab:
         _render_artifact_guidance(artifact_readiness, "evaluation")

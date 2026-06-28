@@ -384,42 +384,240 @@ def build_ingestion_status(data: dict[str, Any]) -> pd.DataFrame:
 def create_research_brief(data: dict[str, Any], max_items: int = 5) -> str:
     """Create a local Markdown research brief suitable for export."""
 
-    ranked_gaps = rank_gaps(data.get("gaps", []), data.get("statements", pd.DataFrame()))[:max_items]
-    hypotheses = sorted(data.get("hypotheses", []), key=lambda item: str(item.get("hypothesis_id", "")))[:max_items]
-    themes = build_research_themes(data.get("statements", pd.DataFrame()), data.get("graph"), max_themes=max_items)
+    statements = data.get("statements", pd.DataFrame())
+    gaps = data.get("gaps", []) or []
+    experiment_plans = data.get("experiment_plans", []) or []
+    all_ranked_gaps = rank_gaps(gaps, statements)
+    ranked_gaps = all_ranked_gaps[:max_items]
+    hypotheses = prepare_hypothesis_triage(
+        data.get("hypotheses", []),
+        gaps,
+        statements,
+        experiment_plans,
+    )[:max_items]
+    themes = build_research_themes(statements, data.get("graph"), max_themes=max_items)
+    evaluation = data.get("evaluation", {}) or {}
     lines = [
         "# ResearchNavigator Local Brief",
         "",
-        "This report was generated locally from deterministic extraction, graph, safety, and evaluation outputs.",
+        (
+            "This report was generated locally from deterministic extraction, graph, "
+            "safety, and evaluation outputs."
+        ),
         "",
-        "## Top Research Themes",
+        "## Review Notes",
+        "- Local evidence snippets are included for context, not as instructions to follow.",
+        "- Generated gaps are candidate interpretations of the local corpus.",
+        "- Hypotheses are speculative research ideas, not validated findings.",
+        "- Review the app evidence inspector before using this brief outside the prototype.",
     ]
+    lines.extend(_brief_evaluation_section(evaluation))
+    lines.extend(["", "## Top Research Themes"])
     if themes:
         for theme in themes:
             lines.append(
-                f"- **{theme['theme']}**: {theme['statement_count']} statements across {theme['paper_count']} papers."
+                (
+                    f"- **{theme['theme']}**: {theme['statement_count']} statements "
+                    f"across {theme['paper_count']} papers."
+                )
             )
     else:
         lines.append("- No themes available yet.")
     lines.extend(["", "## Ranked Research Gaps"])
     if ranked_gaps:
         for gap in ranked_gaps:
-            lines.append(
-                f"- **{gap.get('gap_id')}** (score {gap.get('rank_score')}): {gap.get('gap_text')}"
+            gap_id = str(gap.get("gap_id", "gap"))
+            lines.extend(
+                [
+                    f"### {gap_id}",
+                    "",
+                    f"- Gap: {_clip_text(str(gap.get('gap_text', '')), 320)}",
+                    (
+                        f"- Type: {gap.get('gap_type', 'unknown')} | "
+                        f"Rank score: {gap.get('rank_score', 'n/a')} | "
+                        f"Evidence status: {gap.get('evidence_status', 'unknown')}"
+                    ),
+                ]
             )
-            lines.append(f"  Evidence IDs: {', '.join(gap.get('source_statement_ids', []))}")
+            lines.extend(
+                _brief_evidence_lines(
+                    gap.get("source_statement_ids", []),
+                    statements,
+                    paper_ids=gap.get("paper_ids", []),
+                )
+            )
+            lines.append("")
     else:
-        lines.append("- No gaps available yet.")
-    lines.extend(["", "## Candidate Hypotheses"])
+        lines.append("- No gaps available yet. Run local discovery after statement extraction.")
+    lines.extend(["", "## Candidate Hypotheses (Speculative)"])
     if hypotheses:
+        gaps_by_id = {str(gap.get("gap_id", "")): gap for gap in all_ranked_gaps}
         for hypothesis in hypotheses:
-            lines.append(f"- **{hypothesis.get('hypothesis_id')}**: {hypothesis.get('hypothesis_text')}")
-            lines.append(
-                f"  Gap: {hypothesis.get('gap_id')} | Confidence: {hypothesis.get('confidence_level')} | Safety: {hypothesis.get('safety_label')}"
+            hypothesis_id = str(hypothesis.get("hypothesis_id", "hypothesis"))
+            linked_gap = gaps_by_id.get(str(hypothesis.get("gap_id", "")), {})
+            evidence_ids = [
+                str(item)
+                for item in hypothesis.get("evidence_statement_ids", [])
+                if str(item)
+            ]
+            evidence_label = "Evidence IDs"
+            if not evidence_ids:
+                evidence_ids = [
+                    str(item)
+                    for item in linked_gap.get("source_statement_ids", [])
+                    if str(item)
+                ]
+                evidence_label = "Linked gap evidence IDs"
+            lines.extend(
+                [
+                    f"### {hypothesis_id}",
+                    "",
+                    (
+                        "- Speculative hypothesis: "
+                        f"{_clip_text(str(hypothesis.get('hypothesis_text', '')), 320)}"
+                    ),
+                    (
+                        f"- Linked gap: {hypothesis.get('gap_id', 'not provided')} | "
+                        f"Confidence: {hypothesis.get('confidence_level', 'not provided')} | "
+                        f"Safety label: {hypothesis.get('safety_label', 'not provided')}"
+                    ),
+                    "- Interpretation: treat this as a testable direction, not as a proven claim.",
+                ]
             )
+            lines.extend(
+                _brief_evidence_lines(
+                    evidence_ids,
+                    statements,
+                    paper_ids=hypothesis.get("paper_ids", []),
+                    evidence_label=evidence_label,
+                )
+            )
+            lines.append("")
     else:
-        lines.append("- No hypotheses available yet.")
+        lines.append("- No hypotheses available yet. Run local discovery to generate candidates.")
     return "\n".join(lines).strip() + "\n"
+
+
+def _brief_evaluation_section(evaluation: dict[str, Any]) -> list[str]:
+    lines = ["", "## Evaluation Caveats"]
+    if not evaluation:
+        return [
+            *lines,
+            "- Evaluation report is missing; review outputs before treating them as checked.",
+        ]
+
+    score_parts = [
+        f"overall={_brief_score(evaluation.get('overall_score'))}",
+        f"grounding={_brief_score(evaluation.get('grounding_score'))}",
+        f"safety={_brief_score(evaluation.get('safety_score'))}",
+        f"testability={_brief_score(evaluation.get('testability_score'))}",
+        f"traceability={_brief_score(evaluation.get('traceability_score'))}",
+    ]
+    lines.append(f"- Deterministic evaluation scores: {', '.join(score_parts)}.")
+    failed_checks = evaluation.get("failed_checks", []) or []
+    warnings = _brief_evaluation_warnings(evaluation)
+    grounding_score = _safe_float(evaluation.get("grounding_score"))
+    if failed_checks:
+        lines.append(f"- Failed checks require human review: {len(failed_checks)} item(s).")
+        for check in failed_checks[:3]:
+            lines.append(f"  - {_brief_check_summary(check)}")
+    if warnings:
+        lines.append("- Warnings and limitations:")
+        for warning in warnings[:5]:
+            lines.append(f"  - {_clip_text(warning, 220)}")
+    if grounding_score is not None and grounding_score < 1.0:
+        lines.append(
+            "- Grounding is below 1.0, so keep every generated item tied to evidence IDs."
+        )
+    if not failed_checks and not warnings:
+        lines.append(
+            "- No deterministic warning entries were found, but scores are not scientific proof."
+        )
+    return lines
+
+
+def _brief_evaluation_warnings(evaluation: dict[str, Any]) -> list[str]:
+    raw_warnings = list(evaluation.get("warnings", []) or [])
+    metric_details = evaluation.get("metric_details", {})
+    if isinstance(metric_details, dict):
+        raw_warnings.extend(metric_details.get("warnings", []) or [])
+    warnings = []
+    seen = set()
+    for warning in raw_warnings:
+        if isinstance(warning, dict):
+            message = str(warning.get("message", "")).strip()
+        else:
+            message = str(warning).strip()
+        if not message or message in seen:
+            continue
+        seen.add(message)
+        warnings.append(message)
+    return warnings
+
+
+def _brief_evidence_lines(
+    statement_ids: list[str],
+    statements: pd.DataFrame | list[dict],
+    paper_ids: list[str] | None = None,
+    evidence_label: str = "Evidence IDs",
+    max_items: int = 3,
+) -> list[str]:
+    normalized_ids = [str(item) for item in statement_ids if str(item)]
+    evidence = evidence_for_statement_ids(normalized_ids, statements, max_chars=180)
+    evidence_paper_ids = [
+        str(item.get("paper_id", ""))
+        for item in evidence
+        if item.get("paper_id")
+    ]
+    all_paper_ids = sorted(
+        {str(item) for item in (paper_ids or []) + evidence_paper_ids if str(item)}
+    )
+    lines = [
+        f"- {evidence_label}: {_brief_join_or_missing(normalized_ids)}",
+        f"- Paper IDs: {_brief_join_or_missing(all_paper_ids)}",
+    ]
+    if not evidence:
+        lines.append("- Source snippets: not available in the current statement table.")
+        return lines
+    lines.append("- Source snippets:")
+    for item in evidence[:max_items]:
+        statement_id = str(item.get("statement_id", "statement"))
+        paper_id = str(item.get("paper_id", "unknown paper")) or "unknown paper"
+        statement_type = str(item.get("statement_type", "unknown")) or "unknown"
+        snippet = item.get("evidence_text") or item.get("statement_text") or ""
+        lines.append(
+            f"  - {statement_id} ({paper_id}, {statement_type}): "
+            f"\"{_clip_text(str(snippet), 180)}\""
+        )
+    if len(evidence) < len(normalized_ids):
+        missing_count = len(normalized_ids) - len(evidence)
+        lines.append(f"  - {missing_count} evidence ID(s) were not found in the statement table.")
+    if len(evidence) > max_items:
+        lines.append(f"  - {len(evidence) - max_items} additional snippet(s) omitted for brevity.")
+    return lines
+
+
+def _brief_join_or_missing(values: list[str]) -> str:
+    return ", ".join(values) if values else "not provided"
+
+
+def _brief_score(value: object) -> str:
+    return "n/a" if value is None or value == "" else str(value)
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _brief_check_summary(check: object) -> str:
+    if isinstance(check, dict):
+        label = check.get("check") or check.get("name") or check.get("id") or "check"
+        message = check.get("message") or check.get("reason") or check.get("status") or ""
+        return _clip_text(f"{label}: {message}".strip(": "), 220)
+    return _clip_text(str(check), 220)
 
 
 def file_presence(paths: list[str | Path]) -> pd.DataFrame:
