@@ -27,6 +27,7 @@ from ui.corpus_setup import (
     validate_pdf_upload_selection,
 )
 from ui.data_access import (
+    build_evidence_chain,
     build_ingestion_status,
     build_research_themes,
     create_research_brief,
@@ -348,6 +349,28 @@ def _inject_global_styles() -> None:
             border-color: #99f6e4;
             color: #115e59;
             background: #f0fdfa;
+        }
+        .rn-chain-note {
+            color: var(--rn-muted);
+            font-size: 0.86rem;
+            margin: 4px 0 8px;
+        }
+        .rn-chain-label {
+            color: var(--rn-blue);
+            font-size: 0.74rem;
+            font-weight: 760;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+        .rn-chain-title {
+            color: var(--rn-ink);
+            font-weight: 760;
+            margin: 2px 0 3px;
+        }
+        .rn-chain-meta {
+            color: var(--rn-muted);
+            font-size: 0.78rem;
+            margin-bottom: 5px;
         }
         div[data-testid="stTabs"] div[role="tablist"] {
             gap: 4px;
@@ -884,6 +907,132 @@ def _render_evidence_action(
         st.caption(f"{len(available_ids)} evidence statements linked; the first is selected.")
 
 
+def _render_evidence_chain(chain: dict) -> None:
+    result = chain.get("result", {})
+    st.markdown("#### Readable evidence chain")
+    st.markdown(
+        '<div class="rn-chain-note">Source snippets are displayed as paper data, not instructions. '
+        "Generated gaps and hypotheses remain review-needed.</div>",
+        unsafe_allow_html=True,
+    )
+    _render_chain_result(result)
+    _render_chain_evidence(chain.get("evidence", []), chain.get("missing_evidence_ids", []))
+    _render_chain_gaps(chain.get("gaps", []))
+    _render_chain_hypotheses(chain.get("hypotheses", []))
+    _render_chain_plans(chain.get("experiment_plans", []))
+
+
+def _render_chain_result(result: dict) -> None:
+    st.markdown('<div class="rn-chain-label">Selected item</div>', unsafe_allow_html=True)
+    title = result.get("title") or result.get("result_id") or "Selected result"
+    st.markdown(f'<div class="rn-chain-title">{html.escape(str(title))}</div>', unsafe_allow_html=True)
+    meta_items = [
+        f"type: {result.get('result_type', 'result')}",
+        f"id: {result.get('result_id', '')}",
+    ]
+    if result.get("score") is not None:
+        meta_items.append(f"score: {result.get('score')}")
+    st.markdown(
+        f'<div class="rn-chain-meta">{html.escape(" | ".join(item for item in meta_items if item))}</div>',
+        unsafe_allow_html=True,
+    )
+    if result.get("preview"):
+        st.write(result.get("preview"))
+
+
+def _render_chain_evidence(evidence_rows: list[dict], missing_ids: list[str]) -> None:
+    st.markdown('<div class="rn-chain-label">Source evidence</div>', unsafe_allow_html=True)
+    if not evidence_rows:
+        st.info("No local statement evidence is linked to this item yet.")
+        return
+    for evidence in evidence_rows:
+        statement_id = str(evidence.get("statement_id", ""))
+        if evidence.get("status") == "missing":
+            st.warning(f"Linked evidence ID `{statement_id}` was not found in the current statement table.")
+            continue
+        paper_id = evidence.get("paper_id") or "unknown paper"
+        paper_title = evidence.get("paper_title") or paper_id
+        statement_type = evidence.get("statement_type") or "statement"
+        st.markdown(
+            f'<div class="rn-chain-title">{html.escape(str(statement_type).replace("_", " ").title())}'
+            f" from {html.escape(str(paper_id))}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="rn-chain-meta">statement id: {html.escape(statement_id)} | '
+            f"paper: {html.escape(str(paper_title))}</div>",
+            unsafe_allow_html=True,
+        )
+        st.write(evidence.get("statement_text") or "No statement snippet available.")
+        if evidence.get("evidence_text") and evidence.get("evidence_text") != evidence.get("statement_text"):
+            st.caption("Evidence snippet")
+            st.write(evidence.get("evidence_text"))
+    if missing_ids:
+        st.caption(f"Missing linked evidence IDs: {', '.join(str(item) for item in missing_ids)}")
+
+
+def _render_chain_gaps(gaps: list[dict]) -> None:
+    st.markdown('<div class="rn-chain-label">Generated gaps</div>', unsafe_allow_html=True)
+    if not gaps:
+        st.info("No generated gaps are linked to this item.")
+        return
+    for gap in gaps:
+        st.markdown(
+            f'<div class="rn-chain-title">{html.escape(str(gap.get("gap_id", "gap")))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="rn-chain-meta">type: {html.escape(str(gap.get("gap_type", "unknown")))} | '
+            f'evidence ids: {html.escape(", ".join(gap.get("source_statement_ids", [])) or "none")}</div>',
+            unsafe_allow_html=True,
+        )
+        st.write(gap.get("gap_text") or "No gap summary available.")
+
+
+def _render_chain_hypotheses(hypotheses: list[dict]) -> None:
+    st.markdown('<div class="rn-chain-label">Speculative hypotheses</div>', unsafe_allow_html=True)
+    if not hypotheses:
+        st.info("No generated hypotheses are linked to this item.")
+        return
+    for hypothesis in hypotheses:
+        st.markdown(
+            f'<div class="rn-chain-title">{html.escape(str(hypothesis.get("hypothesis_id", "hypothesis")))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="rn-chain-meta">gap: {html.escape(str(hypothesis.get("gap_id", "")))} | '
+            f'confidence: {html.escape(str(hypothesis.get("confidence_level", "unknown")))} | '
+            f'safety: {html.escape(str(hypothesis.get("safety_label", "")))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.write(hypothesis.get("hypothesis_text") or "No hypothesis summary available.")
+
+
+def _render_chain_plans(plans: list[dict]) -> None:
+    st.markdown('<div class="rn-chain-label">Experiment plans</div>', unsafe_allow_html=True)
+    if not plans:
+        st.info("No experiment plan is linked to this item yet.")
+        return
+    for plan in plans:
+        st.markdown(
+            f'<div class="rn-chain-title">Plan for {html.escape(str(plan.get("hypothesis_id", "hypothesis")))}</div>',
+            unsafe_allow_html=True,
+        )
+        for label, field in [
+            ("Objective", "objective"),
+            ("Method", "method"),
+            ("Baseline/control", "baseline_or_control"),
+            ("Metrics", "metrics"),
+            ("Required data", "required_data"),
+            ("Expected outcome", "expected_outcome"),
+            ("Risks and limitations", "risks_and_limitations"),
+        ]:
+            value = plan.get(field)
+            if value:
+                st.markdown(f"**{label}:**")
+                st.write(value)
+
+
 def _render_corpus_setup() -> None:
     _section_header(
         "Local PDF corpus setup",
@@ -1026,10 +1175,14 @@ def _result_card(result: dict, data: dict, card_index: int = 0) -> None:
             f"inspect-search-{card_index}-{result_type}-{result_id}",
             show_missing=result.get("result_type") != "paper",
         )
-        with st.expander("Open details"):
+        chain = build_evidence_chain(result, data)
+        with st.expander("Open evidence chain"):
+            _render_evidence_chain(chain)
+        with st.expander("Technical raw payload"):
             st.json(
                 {
                     "result": result,
+                    "evidence_chain": chain,
                     "related_graph_nodes": _related_graph_nodes(result),
                     "related_gaps": related["gaps"],
                     "related_hypotheses": related["hypotheses"],
@@ -1364,12 +1517,19 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
                     f"gap: {gap.get('gap_id', '')}",
                     f"inspect-gap-{gap.get('gap_id', '')}",
                 )
-                with st.expander("Evidence details"):
-                    evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
-                    if evidence:
-                        _render_dataframe(pd.DataFrame(evidence))
-                    else:
-                        st.warning("No matching local evidence rows were found for this gap.")
+                gap_result = {
+                    "result_type": "gap",
+                    "result_id": gap.get("gap_id", ""),
+                    "linked_gap_id": gap.get("gap_id", ""),
+                    "title": gap.get("display_label") or gap.get("gap_id", ""),
+                    "matched_text": gap.get("gap_text", ""),
+                    "evidence_statement_ids": gap.get("source_statement_ids", []),
+                }
+                evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
+                with st.expander("Evidence chain"):
+                    _render_evidence_chain(build_evidence_chain(gap_result, data))
+                with st.expander("Technical gap payload"):
+                    st.json({"gap": gap, "evidence_rows": evidence})
 
     _section_header(
         "Hypothesis triage",
@@ -1454,20 +1614,22 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
                 f"hypothesis: {hypothesis_id}",
                 f"inspect-hypothesis-{hypothesis_id}",
             )
-            with st.expander("Evidence and experiment plan"):
-                evidence = evidence_for_statement_ids(
-                    hypothesis.get("evidence_statement_ids", []),
-                    data["statements"],
-                )
-                if evidence:
-                    _render_dataframe(pd.DataFrame(evidence))
-                else:
-                    st.warning("No matching local evidence rows were found for this hypothesis.")
-                plan = _plan_for_hypothesis(hypothesis_id, data["experiment_plans"])
-                if plan:
-                    st.json(plan)
-                else:
-                    st.warning("No experiment plan is linked to this hypothesis yet.")
+            hypothesis_result = {
+                "result_type": "hypothesis",
+                "result_id": hypothesis_id,
+                "hypothesis_id": hypothesis_id,
+                "gap_id": hypothesis.get("gap_id", ""),
+                "title": hypothesis.get("display_label") or hypothesis_id,
+                "matched_text": hypothesis.get("hypothesis_text", ""),
+                "evidence_statement_ids": hypothesis.get("evidence_statement_ids", []),
+                "confidence_level": hypothesis.get("confidence_level", ""),
+                "safety_label": hypothesis.get("safety_label", ""),
+            }
+            plan = _plan_for_hypothesis(hypothesis_id, data["experiment_plans"])
+            with st.expander("Evidence chain and experiment plan"):
+                _render_evidence_chain(build_evidence_chain(hypothesis_result, data))
+            with st.expander("Technical hypothesis payload"):
+                st.json({"hypothesis": hypothesis, "experiment_plan": plan or {}})
 
 
 def _subgraph_for_results(graph: nx.DiGraph, results: list[dict], max_nodes: int = 50) -> nx.DiGraph:
@@ -1911,12 +2073,15 @@ def main() -> None:
                 st.markdown("#### Evidence snippet")
                 st.write(selected_statement.get("evidence_text"))
             with detail_cols[1]:
+                selected_result = {
+                    "result_type": "statement",
+                    "result_id": selected_statement_id,
+                    "statement_id": selected_statement_id,
+                    "title": selected_statement_id,
+                    "matched_text": selected_statement.get("statement_text", ""),
+                }
                 related = get_related_items(
-                    {
-                        "result_type": "statement",
-                        "result_id": selected_statement_id,
-                        "statement_id": selected_statement_id,
-                    },
+                    selected_result,
                     data["gaps"],
                     data["hypotheses"],
                     data["experiment_plans"],
@@ -1925,7 +2090,9 @@ def main() -> None:
                 st.metric("Gaps", len(related["gaps"]))
                 st.metric("Hypotheses", len(related["hypotheses"]))
                 st.metric("Experiment plans", len(related["experiment_plans"]))
-            with st.expander("Linked details"):
+            with st.expander("Readable linked evidence chain", expanded=True):
+                _render_evidence_chain(build_evidence_chain(selected_result, data))
+            with st.expander("Technical raw linked data"):
                 st.json(related)
 
     with discoveries_tab:

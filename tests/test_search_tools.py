@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from ui.data_access import (
+    build_evidence_chain,
     build_ingestion_status,
     build_research_themes,
     create_research_brief,
@@ -101,6 +102,95 @@ def test_related_gaps_and_hypotheses_are_found_by_evidence_ids():
     assert related["gaps"] == gaps
     assert related["hypotheses"] == hypotheses
     assert related["experiment_plans"] == plans
+
+
+def test_build_evidence_chain_summarizes_linked_outputs_with_clipped_snippets():
+    long_text = "This limitation describes a narrow evaluation setting with sparse noisy data. " * 4
+    data = {
+        "papers": pd.DataFrame([{"paper_id": "paper_001", "title": "Synthetic Evidence Paper"}]),
+        "statements": pd.DataFrame(
+            [
+                {
+                    "statement_id": "stmt_long",
+                    "paper_id": "paper_001",
+                    "chunk_id": "paper_001:chunk_0000",
+                    "statement_type": "limitation",
+                    "statement_text": long_text,
+                    "evidence_text": long_text,
+                }
+            ]
+        ),
+        "gaps": [
+            {
+                "gap_id": "gap_001",
+                "gap_type": "limitation",
+                "gap_text": "A possible research gap is suggested by a reported limitation.",
+                "source_statement_ids": ["stmt_long"],
+                "paper_ids": ["paper_001"],
+            }
+        ],
+        "hypotheses": [
+            {
+                "hypothesis_id": "hyp_001",
+                "gap_id": "gap_001",
+                "hypothesis_text": "A testable hypothesis could be evaluated locally.",
+                "confidence_level": "low",
+                "safety_label": "speculative_research_hypothesis",
+                "evidence_statement_ids": ["stmt_long"],
+            }
+        ],
+        "experiment_plans": [
+            {
+                "hypothesis_id": "hyp_001",
+                "plan": {
+                    "objective": "Test the candidate hypothesis.",
+                    "method": "Compare against a baseline.",
+                    "metrics": ["robustness", "coverage"],
+                },
+            }
+        ],
+    }
+    result = {"result_type": "statement", "result_id": "stmt_long", "statement_id": "stmt_long"}
+
+    chain = build_evidence_chain(result, data, max_chars=80)
+
+    assert chain["evidence"][0]["status"] == "available"
+    assert chain["evidence"][0]["paper_title"] == "Synthetic Evidence Paper"
+    assert chain["evidence"][0]["statement_text"].endswith("...")
+    assert chain["gaps"][0]["gap_id"] == "gap_001"
+    assert chain["hypotheses"][0]["safety_label"] == "speculative_research_hypothesis"
+    assert chain["experiment_plans"][0]["metrics"] == "robustness, coverage"
+
+
+def test_build_evidence_chain_labels_missing_evidence_ids():
+    data = {
+        "papers": pd.DataFrame(),
+        "statements": pd.DataFrame(),
+        "gaps": [
+            {
+                "gap_id": "gap_missing",
+                "gap_type": "limitation",
+                "gap_text": "A possible gap with missing local evidence.",
+                "source_statement_ids": ["stmt_missing"],
+            }
+        ],
+        "hypotheses": [],
+        "experiment_plans": [],
+    }
+    result = {"result_type": "gap", "result_id": "gap_missing", "linked_gap_id": "gap_missing"}
+
+    chain = build_evidence_chain(result, data)
+
+    assert chain["missing_evidence_ids"] == ["stmt_missing"]
+    assert chain["evidence"][0] == {
+        "statement_id": "stmt_missing",
+        "status": "missing",
+        "paper_id": "",
+        "paper_title": "",
+        "statement_type": "",
+        "statement_text": "",
+        "evidence_text": "",
+    }
 
 
 def test_load_processed_data_handles_missing_files(tmp_path):

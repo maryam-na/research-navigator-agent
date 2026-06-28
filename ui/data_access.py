@@ -654,6 +654,67 @@ def get_related_items(
     }
 
 
+def build_evidence_chain(result: dict, data: dict[str, Any], max_chars: int = 220) -> dict:
+    """Build a readable, compact evidence chain for a search or discovery result."""
+
+    related = get_related_items(
+        result,
+        data.get("gaps", []),
+        data.get("hypotheses", []),
+        data.get("experiment_plans", []),
+    )
+    evidence_ids = _evidence_ids_for_chain(result, related)
+    statement_rows = statement_lookup(data.get("statements", pd.DataFrame()))
+    paper_titles = {
+        str(paper.get("paper_id", "")): str(paper.get("title", "") or paper.get("paper_id", ""))
+        for paper in _records(data.get("papers", pd.DataFrame()))
+    }
+    evidence = []
+    missing_ids = []
+    for statement_id in evidence_ids:
+        statement = statement_rows.get(statement_id)
+        if not statement:
+            missing_ids.append(statement_id)
+            evidence.append(
+                {
+                    "statement_id": statement_id,
+                    "status": "missing",
+                    "paper_id": "",
+                    "paper_title": "",
+                    "statement_type": "",
+                    "statement_text": "",
+                    "evidence_text": "",
+                }
+            )
+            continue
+        paper_id = str(statement.get("paper_id", ""))
+        evidence.append(
+            {
+                "statement_id": statement_id,
+                "status": "available",
+                "paper_id": paper_id,
+                "paper_title": paper_titles.get(paper_id, paper_id),
+                "statement_type": statement.get("statement_type", ""),
+                "statement_text": _clip_text(str(statement.get("statement_text", "")), max_chars),
+                "evidence_text": _clip_text(str(statement.get("evidence_text", "")), max_chars),
+            }
+        )
+    return {
+        "result": _summarize_result_for_chain(result, max_chars),
+        "evidence": evidence,
+        "missing_evidence_ids": missing_ids,
+        "gaps": [_summarize_gap_for_chain(gap, max_chars) for gap in related["gaps"]],
+        "hypotheses": [
+            _summarize_hypothesis_for_chain(hypothesis, max_chars)
+            for hypothesis in related["hypotheses"]
+        ],
+        "experiment_plans": [
+            _summarize_plan_for_chain(plan, max_chars)
+            for plan in related["experiment_plans"]
+        ],
+    }
+
+
 def search_all(query: str, data: dict[str, Any], filters: dict | None = None) -> dict[str, list[dict]]:
     filters = filters or {}
     result_type = filters.get("result_type", "all")
@@ -668,6 +729,80 @@ def search_all(query: str, data: dict[str, Any], filters: dict | None = None) ->
         key = result_type if result_type.endswith("s") else f"{result_type}s"
         return {name: values if name == key else [] for name, values in results.items()}
     return results
+
+
+def _evidence_ids_for_chain(result: dict, related: dict) -> list[str]:
+    candidates: list[object] = []
+    if result.get("statement_id"):
+        candidates.append(result["statement_id"])
+    elif result.get("result_type") == "statement" and result.get("result_id"):
+        candidates.append(result["result_id"])
+    candidates.extend(result.get("evidence_statement_ids", []) or [])
+    for gap in related.get("gaps", []):
+        candidates.extend(gap.get("source_statement_ids", []) or [])
+    for hypothesis in related.get("hypotheses", []):
+        candidates.extend(hypothesis.get("evidence_statement_ids", []) or [])
+    evidence_ids = []
+    seen = set()
+    for candidate in candidates:
+        statement_id = str(candidate or "").strip()
+        if not statement_id or statement_id in seen:
+            continue
+        seen.add(statement_id)
+        evidence_ids.append(statement_id)
+    return evidence_ids
+
+
+def _summarize_result_for_chain(result: dict, max_chars: int) -> dict:
+    result_id = result.get("result_id") or result.get("statement_id") or result.get("hypothesis_id") or ""
+    preview = result.get("matched_text") or result.get("evidence_snippet") or result.get("title") or ""
+    return {
+        "result_type": str(result.get("result_type", "result")),
+        "result_id": str(result_id),
+        "title": _clip_text(str(result.get("title") or result_id or "Result"), max_chars),
+        "preview": _clip_text(str(preview), max_chars),
+        "score": result.get("score"),
+        "linked_gap_id": result.get("linked_gap_id") or result.get("gap_id", ""),
+        "linked_hypothesis_id": result.get("linked_hypothesis_id") or result.get("hypothesis_id", ""),
+    }
+
+
+def _summarize_gap_for_chain(gap: dict, max_chars: int) -> dict:
+    return {
+        "gap_id": gap.get("gap_id", ""),
+        "gap_type": gap.get("gap_type", ""),
+        "gap_text": _clip_text(str(gap.get("gap_text", "")), max_chars),
+        "source_statement_ids": [str(item) for item in gap.get("source_statement_ids", [])],
+        "paper_ids": [str(item) for item in gap.get("paper_ids", [])],
+        "rank_score": gap.get("rank_score"),
+    }
+
+
+def _summarize_hypothesis_for_chain(hypothesis: dict, max_chars: int) -> dict:
+    return {
+        "hypothesis_id": hypothesis.get("hypothesis_id", ""),
+        "gap_id": hypothesis.get("gap_id", ""),
+        "hypothesis_text": _clip_text(str(hypothesis.get("hypothesis_text", "")), max_chars),
+        "confidence_level": hypothesis.get("confidence_level", ""),
+        "safety_label": hypothesis.get("safety_label", ""),
+        "evidence_statement_ids": [str(item) for item in hypothesis.get("evidence_statement_ids", [])],
+        "rationale": _clip_text(str(hypothesis.get("rationale", "")), max_chars),
+    }
+
+
+def _summarize_plan_for_chain(plan_record: dict, max_chars: int) -> dict:
+    plan = plan_record.get("plan", {}) or {}
+    metrics = plan.get("metrics", [])
+    return {
+        "hypothesis_id": plan_record.get("hypothesis_id", ""),
+        "objective": _clip_text(str(plan.get("objective", "")), max_chars),
+        "method": _clip_text(str(plan.get("method", "")), max_chars),
+        "baseline_or_control": _clip_text(str(plan.get("baseline_or_control", "")), max_chars),
+        "metrics": ", ".join(str(item) for item in metrics) if isinstance(metrics, list) else str(metrics),
+        "expected_outcome": _clip_text(str(plan.get("expected_outcome", "")), max_chars),
+        "risks_and_limitations": _clip_text(str(plan.get("risks_and_limitations", "")), max_chars),
+        "required_data": _clip_text(str(plan.get("required_data", "")), max_chars),
+    }
 
 
 def _evidence_status(evidence_count: int, available_evidence_count: int) -> str:
