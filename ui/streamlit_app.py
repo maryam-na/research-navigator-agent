@@ -16,6 +16,15 @@ import streamlit as st
 from app.adk_tools import describe_agent_capabilities, planned_tool_trajectory
 from app.mcp_server import MCP_SERVER_NAME, mcp_tool_manifest
 from tools.graph_tools import graph_summary
+from ui.corpus_setup import (
+    CORPUS_MAX_PDFS,
+    CORPUS_MIN_PDFS,
+    DEFAULT_MANIFEST_PATH,
+    DEFAULT_PAPERS_DIR,
+    describe_pdf_corpus,
+    save_uploaded_pdfs,
+    validate_pdf_upload_selection,
+)
 from ui.data_access import (
     build_ingestion_status,
     build_research_themes,
@@ -25,15 +34,18 @@ from ui.data_access import (
     get_related_items,
     graph_to_tables,
     load_graph,
-    load_json_file as load_json_file,
-    load_processed_data as _load_processed_bundle,
     load_table,
     rank_gaps,
     rank_results,
-    search_all,
     score_statement_quality,
+    search_all,
 )
-
+from ui.data_access import (
+    load_json_file as load_json_file,
+)
+from ui.data_access import (
+    load_processed_data as _load_processed_bundle,
+)
 
 DEFAULT_DB_PATH = Path("data/processed/papers.sqlite")
 DEFAULT_GRAPH_PATH = Path("data/processed/research_graph.graphml")
@@ -405,6 +417,109 @@ def _metric_cards(items: list[tuple[str, object]], columns: int = 4) -> None:
     st.markdown(f'<div class="rn-metric-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
+def _render_corpus_setup() -> None:
+    _section_header(
+        "Local PDF corpus setup",
+        "Add 5-10 permitted PDFs to the local workspace before running the deterministic pipeline.",
+        "Corpus",
+    )
+    status = describe_pdf_corpus(DEFAULT_PAPERS_DIR, DEFAULT_MANIFEST_PATH)
+    _metric_cards(
+        [
+            ("Local PDFs", status["pdf_count"]),
+            ("Manifest entries", status["manifest_count"]),
+            ("MVP range", f"{CORPUS_MIN_PDFS}-{CORPUS_MAX_PDFS}"),
+            ("Processed DB", "ready" if DEFAULT_DB_PATH.exists() else "missing"),
+        ],
+        columns=4,
+    )
+    _render_corpus_status_message(status)
+
+    with st.container(border=True):
+        st.markdown("#### Add PDFs")
+        uploaded_files = st.file_uploader(
+            "PDF files",
+            type=["pdf"],
+            accept_multiple_files=True,
+            help="Files are saved only under data/papers in this workspace.",
+        )
+        replace_existing = st.checkbox(
+            "Replace existing local PDFs before saving",
+            value=False,
+            help="Only PDF files in data/papers are removed; processed artifacts are left untouched.",
+        )
+        confirmed_permission = st.checkbox(
+            "I confirm these papers are synthetic, sample, open-access, or otherwise permitted.",
+            value=False,
+        )
+        uploaded_names = [str(file.name) for file in uploaded_files]
+        validation = validate_pdf_upload_selection(
+            uploaded_names,
+            existing_filenames=status["pdf_files"],
+            replace_existing=replace_existing,
+        )
+        if uploaded_files:
+            for warning in validation.warnings:
+                st.warning(warning)
+            for error in validation.errors:
+                st.error(error)
+        save_disabled = not uploaded_files or not confirmed_permission or bool(validation.errors)
+        if st.button("Save PDFs locally", type="primary", disabled=save_disabled):
+            try:
+                result = save_uploaded_pdfs(
+                    uploaded_files,
+                    papers_dir=DEFAULT_PAPERS_DIR,
+                    manifest_path=DEFAULT_MANIFEST_PATH,
+                    confirmed_permission=confirmed_permission,
+                    replace_existing=replace_existing,
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                saved_count = len(result["saved_files"])
+                status = result["corpus"]
+                st.success(f"Saved {saved_count} PDF file{'s' if saved_count != 1 else ''} locally.")
+                _render_dataframe(pd.DataFrame(result["saved_files"]))
+
+    st.markdown("#### Local corpus files")
+    pdf_rows = pd.DataFrame({"pdf_file": status["pdf_files"]})
+    if pdf_rows.empty:
+        st.info("No local PDFs found in data/papers yet.")
+    else:
+        _render_dataframe(pdf_rows)
+    if status["missing_from_manifest"] or status["missing_from_disk"]:
+        st.warning("The local manifest does not match the PDF files on disk.")
+        _render_dataframe(
+            pd.DataFrame(
+                {
+                    "missing_from_manifest": [", ".join(status["missing_from_manifest"]) or "none"],
+                    "missing_from_disk": [", ".join(status["missing_from_disk"]) or "none"],
+                }
+            )
+        )
+
+    st.markdown("#### Process locally")
+    st.code("\n".join(PIPELINE_COMMANDS[:-1]), language="bash")
+    if not DEFAULT_DB_PATH.exists():
+        st.info("Processed artifacts are missing. Run the local commands above after saving the corpus.")
+
+
+def _render_corpus_status_message(status: dict) -> None:
+    if status["status"] == "ready":
+        st.success("Local corpus is in the MVP range and the manifest matches the PDF files.")
+    elif status["status"] == "empty":
+        st.info("No local PDFs found yet. Add permitted papers to start the MVP corpus.")
+    elif status["status"] == "below_minimum":
+        remaining = CORPUS_MIN_PDFS - int(status["pdf_count"])
+        st.warning(f"Found {status['pdf_count']} PDFs. Add at least {remaining} more before a full MVP run.")
+    elif status["status"] == "over_limit":
+        st.error(
+            f"Found {status['pdf_count']} PDFs. The local MVP limit is {CORPUS_MAX_PDFS} PDFs."
+        )
+    elif status["status"] == "manifest_mismatch":
+        st.warning("Manifest review needed before the final submission check.")
+
+
 def _result_card(result: dict, data: dict) -> None:
     related = get_related_items(
         result,
@@ -747,6 +862,7 @@ def main() -> None:
 
     tabs = st.tabs(
         [
+            "Corpus Setup",
             "Search",
             "Evidence Inspector",
             "Discoveries",
@@ -759,6 +875,9 @@ def main() -> None:
     )
 
     with tabs[0]:
+        _render_corpus_setup()
+
+    with tabs[1]:
         _section_header(
             "Search the local research corpus",
             "Results are ranked across papers, statements, gaps, hypotheses, and experiment plans.",
@@ -809,7 +928,7 @@ def main() -> None:
             )
         st.session_state["last_search_results"] = results
 
-    with tabs[1]:
+    with tabs[2]:
         _section_header(
             "Evidence inspector",
             "Review source statements, compact evidence snippets, quality signals, and linked discoveries.",
@@ -857,7 +976,7 @@ def main() -> None:
             with st.expander("Linked details"):
                 st.json(related)
 
-    with tabs[2]:
+    with tabs[3]:
         _metric_cards(
             [
                 ("Papers", counts["papers"]),
@@ -898,7 +1017,7 @@ def main() -> None:
                     if plans:
                         st.json(plans[0].get("plan", {}))
 
-    with tabs[3]:
+    with tabs[4]:
         _section_header(
             "Research themes",
             "Deterministic clusters from recurring statement keywords and graph coverage.",
@@ -916,7 +1035,7 @@ def main() -> None:
             st.markdown("#### Representative evidence")
             _render_dataframe(pd.DataFrame(evidence))
 
-    with tabs[4]:
+    with tabs[5]:
         search_results = st.session_state.get("last_search_results", [])
         subgraph = _subgraph_for_results(graph, search_results) if search_results else build_small_subgraph(graph)
         _section_header(
@@ -927,7 +1046,7 @@ def main() -> None:
         st.json(graph_summary(subgraph))
         _render_graph(subgraph)
 
-    with tabs[5]:
+    with tabs[6]:
         _section_header("Exportable research brief", "A local Markdown brief generated from current artifacts.", "Report")
         brief = create_research_brief(data)
         st.download_button(
@@ -938,7 +1057,7 @@ def main() -> None:
         )
         st.code(brief, language="markdown")
 
-    with tabs[6]:
+    with tabs[7]:
         if not evaluation:
             st.info("No evaluation report found. Run the evaluation command in Pipeline Trace.")
         else:
@@ -967,7 +1086,7 @@ def main() -> None:
             else:
                 st.success("No deterministic safety failures detected.")
 
-    with tabs[7]:
+    with tabs[8]:
         agent_story = describe_agent_capabilities()
         trajectory = planned_tool_trajectory()
         _section_header("ADK agent view", "Local Google ADK-facing wrapper over deterministic research tools.", "Agent")

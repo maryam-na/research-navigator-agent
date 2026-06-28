@@ -22,6 +22,9 @@ Then launch the dashboard:
 uv run streamlit run ui/streamlit_app.py
 ```
 
+Open `Corpus Setup` in the dashboard to add or replace permitted local PDFs under `data/papers/`.
+The app keeps uploads local, updates `data/papers/manifest.json`, and shows the backend commands to regenerate processed artifacts.
+
 Run deterministic golden cases:
 
 ```bash
@@ -138,7 +141,7 @@ flowchart LR
 Local-first: yes
 Cloud deployment: no
 LLM calls in deterministic MVP: no
-Tests: 146 passed
+Tests: 155 passed
 Golden evals: 5/5 passed
 Preflight: ready
 Dependency audit: local/offline
@@ -247,6 +250,7 @@ Example searches:
 
 Dashboard tabs:
 
+- `Corpus Setup`: add or replace permitted local PDFs, review the manifest, and copy local processing commands.
 - `Search`: search-first interface across papers, statements, gaps, hypotheses, and experiment plans.
 - `Evidence Inspector`: grounded statement review with compact source evidence, linked gaps/hypotheses, and deterministic quality signals.
 - `Discoveries`: ranked research gaps, generated hypotheses, and linked experiment-plan details.
