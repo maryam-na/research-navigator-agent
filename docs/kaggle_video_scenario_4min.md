@@ -1,6 +1,6 @@
 # Four-Minute Kaggle Video Scenario
 
-Target length: about 4 minutes.
+Target length: 4:30. Hard limit: under 5:00.
 
 Use this file for recording only. Do not paste this text into the Kaggle Writeup.
 
@@ -9,16 +9,12 @@ Use this file for recording only. Do not paste this text into the Kaggle Writeup
 Prepare these windows:
 
 1. Terminal in the project folder.
-2. Streamlit dashboard running with:
-
-```bash
-make ui
-```
-
+2. Browser open to the Streamlit local URL.
 3. Antigravity open on the project folder.
-4. Browser open to the Streamlit local URL.
+4. Optional editor tab open to `app/agent.py`, `app/adk_tools.py`, and
+   `app/mcp_server.py`.
 
-Optional pre-run commands:
+Run these commands before recording so the demo uses fresh local artifacts:
 
 ```bash
 make demo
@@ -26,67 +22,107 @@ make preflight
 make validate
 ```
 
+Start the dashboard:
+
+```bash
+make ui
+```
+
+Optional MCP proof command:
+
+```bash
+uv run python -c "from app.mcp_server import mcp_tool_manifest; print(mcp_tool_manifest())"
+```
+
+Claim guardrails:
+
+- Do not claim public deployment. Say the project is locally reproducible.
+- Do not claim Antigravity is code evidence. Show it briefly in the video.
+- Do not claim the deterministic MVP makes LLM calls during pipeline execution.
+- Do not call hypotheses discoveries. Say speculative, evidence-linked hypotheses.
+- Do not quote stale metrics unless `make validate` or the relevant command was rerun.
+
 ## 0:00-0:20 Opening
 
-Screen: show the Streamlit Overview or Search page.
+Screen: Streamlit Overview or Search page, zoomed so text is readable.
 
 Say:
 
-Hi, this is ResearchNavigator Agent, my Agents for Good capstone project. It is a local-first research-discovery assistant that helps users turn a small set of scientific papers into evidence-backed research gaps, speculative hypotheses, experiment plans, and safety evaluation reports.
+Hi, this is ResearchNavigator Agent, my Agents for Good capstone project. It is a
+local-first research-discovery assistant that helps users turn a small set of papers
+into evidence-backed gaps, speculative hypotheses, experiment plans, and safety
+evaluation reports.
 
-## 0:20-0:50 Problem
+## 0:20-0:45 Problem And Value
 
-Screen: show local papers or the Overview counts.
-
-Say:
-
-Researchers and students often need to compare several papers manually. They need to identify methods, datasets, results, limitations, and future-work directions. A normal chatbot can summarize papers, but it may lose grounding, overclaim, or invent citations. ResearchNavigator focuses on a safer workflow: local papers, local storage, evidence IDs, and visible warnings.
-
-## 0:50-1:20 Local Pipeline
-
-Screen: show terminal or Pipeline Trace.
+Screen: Overview counts or the local `data/papers/` folder.
 
 Say:
 
-The backend pipeline runs locally. It ingests PDFs, extracts text, chunks the content, extracts structured research statements, deduplicates and filters noisy statements, stores everything in SQLite, builds a NetworkX knowledge graph, discovers research gaps, generates cautious hypotheses and experiment plans, and evaluates the results.
+Researchers and students often compare papers manually. A generic chatbot may produce
+fluent summaries, but it can lose grounding, overclaim, or invent citations. This
+project focuses on a safer workflow: local papers, local storage, evidence IDs,
+visible warnings, and human review.
 
-Show command:
+## 0:45-1:10 Architecture And Reproducibility
+
+Screen: terminal with recent `make demo` result, or README architecture diagram.
+
+Say:
+
+The backend pipeline runs locally. It parses PDFs, chunks text, extracts structured
+statements, stores them in SQLite, builds a NetworkX research graph, discovers gaps,
+generates cautious hypotheses and experiment plans, and evaluates the results.
+
+Show:
 
 ```bash
 make demo
 ```
 
-## 1:20-1:55 Dashboard And Evidence
+## 1:10-1:55 Dashboard And Evidence
 
-Screen: show Search, then Evidence Inspector.
-
-Say:
-
-The dashboard is designed as a research discovery workspace. In Search, I can explore papers, extracted statements, gaps, hypotheses, and experiment plans. In the Evidence Inspector, each statement shows its source paper, statement type, chunk ID, evidence snippet, quality signals, and linked discoveries. This makes the output traceable instead of just fluent.
-
-## 1:55-2:30 Gaps, Hypotheses, And Plans
-
-Screen: show Discoveries tab and a hypothesis or experiment plan.
+Screen: Search tab, then Evidence Inspector.
 
 Say:
 
-Here, the system ranks candidate research gaps. Each gap is created only when there is source evidence, such as a limitation or future-work statement. Hypotheses are labeled as speculative research hypotheses, not proven discoveries. Each one links back to evidence statement IDs and includes an experiment plan with objective, required data, method, baseline, metrics, expected outcome, and risks.
+The dashboard is a research discovery workspace. Search covers papers, extracted
+statements, gaps, hypotheses, and plans. In the Evidence Inspector, each statement
+shows its source paper, statement type, chunk ID, evidence snippet, quality signals,
+and linked discoveries. This makes the output traceable instead of just fluent.
 
-## 2:30-3:00 Agent Technology: ADK
+## 1:55-2:35 Gaps, Hypotheses, And Plans
 
-Screen: show Pipeline Trace, then briefly show `app/agent.py` and `app/adk_tools.py`.
-
-Say:
-
-The project includes a Google ADK-facing agent wrapper. The agent exposes deterministic local tools for ingestion, graph building, discovery, evaluation, search, evidence inspection, policy checking, and research brief generation. The Pipeline Trace tab shows the tool manifest, planned tool trajectory, safety gates, and final answer contract.
-
-## 3:00-3:25 MCP And Skills
-
-Screen: show `app/mcp_server.py`, then the Pipeline Trace MCP section.
+Screen: Discoveries tab. Open one gap, one hypothesis, and its experiment plan.
 
 Say:
 
-I also added a local MCP server wrapper, which exposes selected ResearchNavigator tools to MCP-compatible clients while keeping the same local-first safety boundaries. The project also includes a reusable `SKILL.md`, so the expected agent behavior, constraints, tool map, and safety rules are documented.
+The system ranks candidate research gaps only when local evidence exists, such as a
+limitation or future-work statement. Each gap shows supporting statement IDs.
+Hypotheses are labeled as speculative research hypotheses, not proven discoveries.
+The linked experiment plan includes objective, required data, method, baseline,
+metrics, expected outcome, and risks.
+
+## 2:35-3:10 Agent Technology: ADK
+
+Screen: Pipeline Trace, then briefly show `app/agent.py` and `app/adk_tools.py`.
+
+Say:
+
+The project includes a Google ADK-facing agent wrapper. The agent exposes deterministic
+local tools for ingestion, graph building, discovery, evaluation, search, evidence
+inspection, policy checking, and brief generation. Pipeline Trace shows the tool
+manifest, planned trajectory, safety gates, and final answer contract.
+
+## 3:10-3:35 MCP And Skills
+
+Screen: Pipeline Trace MCP section, then briefly show `app/mcp_server.py` and `SKILL.md`.
+
+Say:
+
+The local MCP server wrapper exposes selected ResearchNavigator tools to MCP-compatible
+clients while keeping the same local-first safety boundaries. The reusable `SKILL.md`
+documents expected agent behavior, constraints, the tool map, and safety rules.
 
 Optional command to show:
 
@@ -94,27 +130,60 @@ Optional command to show:
 uv run python -c "from app.mcp_server import mcp_tool_manifest; print(mcp_tool_manifest())"
 ```
 
-## 3:25-3:45 Safety And Evaluation
+## 3:35-4:05 Safety And Evaluation
 
-Screen: show Safety & Evaluation tab.
-
-Say:
-
-Safety is part of the product. The system checks prompt-injection phrases in papers, overclaiming, unsupported hypotheses, evidence grounding, testability, and traceability. Current deterministic evaluation reports a strong overall score, and warnings remain visible when evidence diversity or plan specificity needs improvement.
-
-## 3:45-4:00 Antigravity And Closing
-
-Screen: show Antigravity with the project open and a terminal result such as `make preflight`.
+Screen: Safety & Evaluation tab.
 
 Say:
 
-I used Antigravity as the agentic coding environment to inspect the codebase, run local validation commands, and iterate on the ADK and MCP wrapper and Streamlit demo. ResearchNavigator is local-first, evidence-backed, policy-gated, and evaluated, making research exploration more responsible while keeping the human in control.
+Safety is built into the product. The system checks prompt-injection phrases in papers,
+overclaiming, unsupported hypotheses, grounding, testability, and traceability. The
+deterministic checks pass, and warnings remain visible when evidence diversity or plan
+specificity needs review.
+
+## 4:05-4:30 Antigravity And Local Deployability
+
+Screen: Antigravity with this project open and terminal output from `make preflight`
+or `make validate`.
+
+Say:
+
+I used Antigravity as the agentic coding environment to inspect the codebase, run
+local validation commands, and iterate on the ADK/MCP wrapper and Streamlit demo.
+For deployability, this project is reproducible locally with Makefile targets such as
+`make demo`, `make ui`, `make preflight`, `make validate`, and `make mcp`.
+
+## 4:30-4:45 Closing
+
+Screen: dashboard Overview, Search, or Pipeline Trace.
+
+Say:
+
+ResearchNavigator is local-first, evidence-backed, policy-gated, and evaluated. It
+helps make research exploration more responsible while keeping the human in control
+of interpretation.
 
 ## Recording Checklist
 
-- Show the app, not only code.
-- Show ADK files: `app/agent.py` and `app/adk_tools.py`.
-- Show MCP file: `app/mcp_server.py`.
-- Show Antigravity briefly.
-- Show at least one safety/evaluation screen.
-- Keep the final video under 5 minutes.
+- App shown, not only code.
+- Problem and value stated in the first 45 seconds.
+- Architecture explained with SQLite, NetworkX, local pipeline, and Streamlit.
+- Search and Evidence Inspector shown.
+- Discoveries show evidence IDs and speculative hypothesis labels.
+- Pipeline Trace shown for ADK tool manifest and trajectory.
+- MCP wrapper shown through Pipeline Trace, `app/mcp_server.py`, or manifest command.
+- `SKILL.md` shown or mentioned for agent skills.
+- Safety & Evaluation tab shown.
+- Antigravity shown for 15-25 seconds with a local command result.
+- Local reproducibility shown with at least one Makefile command result.
+- No terminal tracebacks or empty dashboard states visible.
+- Final runtime stays under 5:00.
+
+## If Running Long
+
+Cut in this order:
+
+1. Skip opening code files and rely on Pipeline Trace for ADK/MCP visibility.
+2. Skip the optional MCP manifest command.
+3. Show only one discovery card instead of a gap, hypothesis, and plan separately.
+4. Shorten the closing to one sentence.
