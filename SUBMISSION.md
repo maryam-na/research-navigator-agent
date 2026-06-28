@@ -34,11 +34,49 @@ ResearchNavigator Agent uses deterministic local tools to:
 8. Evaluate grounding, safety, testability, and traceability.
 9. Present the workflow in a local Streamlit dashboard.
 
+## Architecture
+
+The architecture is intentionally local and reviewable:
+
+```text
+Local PDFs -> PDF extraction -> statement extraction -> SQLite storage
+    -> NetworkX graph -> gap/hypothesis/plan generation
+    -> safety and evaluation checks -> Streamlit dashboard
+```
+
+The README includes the full Mermaid diagram, setup commands, screenshots, and sample
+output gallery. The dashboard's `Pipeline Trace` tab shows the same architecture as a
+judge-facing execution story with generated file status, local commands, ADK tool
+manifest, MCP tools, safety gates, and final-answer constraints.
+
 ## Agent Technology
 
 The project includes a Google ADK-facing agent wrapper in `app/agent.py`. It registers deterministic local function tools from `app/adk_tools.py` for ingestion, graph building, discovery, evaluation, search, evidence inspection, policy checks, summarization, report generation, capability description, and planned tool trajectory.
 
-This makes the agent architecture explicit while preserving the local-first MVP constraints: no cloud deployment, no model training, and no LLM calls during deterministic pipeline execution. The dashboard’s `Pipeline Trace` tab shows the ADK agent view, tool manifest, planned trajectory, and safety gate for each stage.
+This makes the agent architecture explicit while preserving the local-first MVP
+constraints: no cloud deployment, no model training, and no LLM calls during
+deterministic pipeline execution. The agent is meaningful because it coordinates
+bounded local tools, applies policy checks, keeps research outputs grounded in
+evidence IDs, and exposes the planned trajectory instead of returning an opaque
+summary.
+
+## Capstone Concept Coverage
+
+The project demonstrates more than three course concepts:
+
+- **Agent / ADK:** `app/agent.py`, `app/adk_tools.py`, and the `Pipeline Trace` tab.
+- **MCP server:** `app/mcp_server.py`, `scripts/run_mcp_server.py`, and `make mcp`.
+- **Security features:** prompt-injection, overclaiming, grounding, policy, and
+  sensitive-context checks in `tools/safety_tools.py`, `tools/policy_tools.py`,
+  `tools/evaluation_tools.py`, and `specs/policies.yaml`.
+- **Agent skills:** `SKILL.md`, `.agent/skills/research-navigator/SKILL.md`, and
+  `AGENTS.md`.
+- **Deployability:** local reproducibility through `make demo`, `make preflight`,
+  `make validate`, `make ui`, and `make mcp`.
+- **Antigravity:** demonstrated in the video as the agentic coding environment used
+  to inspect and validate the project.
+
+The detailed criterion-by-criterion map is in `docs/capstone_evaluation_mapping.md`.
 
 ## Why It Matters
 
@@ -67,19 +105,25 @@ Safety controls include:
 Current deterministic evaluation:
 
 ```text
+Tests: 172 passed
 Overall score: 0.917
 Grounding score: 0.78
 Safety score: 1.0
 Testability score: 0.932
 Traceability score: 1.0
 Golden eval pass rate: 5/5
+Preflight: Ready
 Submission validator: Ready
 ```
+
+The evaluation intentionally keeps review warnings visible when evidence diversity is
+narrow or experiment plans are structurally complete but still generic.
 
 ## How To Run
 
 ```bash
 make demo
+make preflight
 make eval
 make validate
 make ui
@@ -89,6 +133,7 @@ Or directly:
 
 ```bash
 uv run python -m scripts.run_demo --reset
+uv run python -m scripts.preflight
 uv run python -m scripts.run_golden_evals
 uv run python -m scripts.validate_submission
 uv run streamlit run ui/streamlit_app.py
@@ -98,6 +143,10 @@ uv run streamlit run ui/streamlit_app.py
 
 - `README.md`: main project overview.
 - `docs/capstone_evaluation_mapping.md`: rubric-to-evidence audit for capstone judging.
+- `docs/kaggle_submission_package.md`: long-form written submission package.
+- `docs/kaggle_writeup_paste_ready.md`: paste-ready Kaggle writeup.
+- `docs/kaggle_video_script.md`: timed video script.
+- `docs/kaggle_video_scenario_4min.md`: screen-by-screen recording scenario.
 - `SKILL.md`: project skill instructions.
 - `AGENTS.md`: shared coding-agent instructions.
 - `app/agent.py`: ADK-facing prototype entry point.
@@ -116,6 +165,7 @@ uv run streamlit run ui/streamlit_app.py
 - The ADK wrapper is prototype-only.
 - Experiment plans are structurally useful but can still be generic.
 - Grounding currently depends on extracted statement IDs, not full page-level citation metadata.
+- Hypotheses and experiment plans require human review before use as research decisions.
 
 ## Next Step
 

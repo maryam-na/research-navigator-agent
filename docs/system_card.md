@@ -90,7 +90,7 @@ Golden cases test extraction, safety, grounding, graph correctness, and gap/hypo
 ```text
 Golden cases: 5/5 passed
 Submission validator: Ready
-Tests: 146 passed
+Tests: 172 passed
 ```
 
 ## Risks And Mitigations

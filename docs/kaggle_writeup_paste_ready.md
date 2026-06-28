@@ -53,6 +53,8 @@ The project also includes a local MCP server wrapper in `app/mcp_server.py`. Thi
 
 ### Course Concepts Demonstrated
 
+The full criterion-by-criterion evidence map is in `docs/capstone_evaluation_mapping.md`.
+
 The project demonstrates several course concepts directly:
 
 - **Agent / ADK:** `app/agent.py` defines the Google ADK-facing agent wrapper, and `app/adk_tools.py` exposes deterministic tools for orchestration.
@@ -61,6 +63,24 @@ The project demonstrates several course concepts directly:
 - **Agent skills:** `SKILL.md` and `.agent/skills/research-navigator/SKILL.md` document reusable project-specific agent behavior.
 - **Deployability:** the project is reproducible locally with `make demo`, `make ui`, `make preflight`, and `make mcp`.
 - **Antigravity:** the video demonstrates the project being inspected and validated inside Antigravity as the agentic coding environment.
+
+### Documentation Rubric Coverage
+
+This writeup is organized to satisfy the written-submission rubric directly:
+
+- **Problem:** manual comparison of small paper collections is slow, and ungrounded AI
+  summaries can overclaim or invent citations.
+- **Solution:** a local pipeline builds structured evidence, a graph, ranked gaps,
+  speculative hypotheses, experiment plans, and evaluation reports.
+- **Architecture:** the README Mermaid diagram, `Pipeline Trace` tab,
+  `docs/system_card.md`, and `docs/agent_technology_story.md` describe the flow from
+  local PDFs to Streamlit.
+- **Setup:** `README.md`, `SUBMISSION.md`, `docs/reproducibility.md`, and
+  `docs/judge_walkthrough.md` provide local run commands.
+- **Images and demo artifacts:** `docs/screenshots/` and `docs/sample_outputs/`
+  provide the gallery and output excerpts.
+- **Project journey:** the limitations and next-steps sections explain what is
+  implemented, what is intentionally local-only, and what still needs human review.
 
 ### Knowledge Graph And Discovery Workflow
 
@@ -85,7 +105,7 @@ The project includes deterministic tests, golden evaluation cases, preflight che
 Current local results:
 
 ```text
-Tests: 146 passed
+Tests: 172 passed
 Golden evals: 5/5 passed
 Submission validator: ready
 Preflight: ready
@@ -97,7 +117,11 @@ Testability score: 0.932
 Traceability score: 1.0
 ```
 
-The project currently has zero failed submission checks. It keeps one honest evaluation warning visible: generated gaps and hypotheses draw evidence from one paper or fewer, and experiment plans are structurally complete but still somewhat generic. I intentionally keep that warning visible because it reflects the product philosophy: a trustworthy research assistant should surface limitations, not bury them.
+The project currently has zero failed submission checks. It keeps two honest evaluation
+warnings visible: generated gaps and hypotheses draw evidence from one paper or fewer,
+and experiment plans are structurally complete but still somewhat generic. I
+intentionally keep those warnings visible because it reflects the product philosophy:
+a trustworthy research assistant should surface limitations, not bury them.
 
 The codebase is also structured for review. Core data contracts are defined with Pydantic schemas. SQLite stores papers, chunks, and statements. NetworkX manages graph construction. Streamlit provides the local dashboard. Pytest covers deterministic behavior. The preflight script checks local readiness, the dependency audit checks lock coverage and local-first dependency risk, and the coverage report makes test coverage visible.
 

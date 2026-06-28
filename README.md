@@ -142,7 +142,7 @@ flowchart LR
 Local-first: yes
 Cloud deployment: no
 LLM calls in deterministic MVP: no
-Tests: 155 passed
+Tests: 172 passed
 Golden evals: 5/5 passed
 Preflight: ready
 Dependency audit: local/offline
@@ -166,14 +166,34 @@ Submission validator: ready
 - No model training or fine-tuning.
 - MVP corpus limited to 5-10 local papers.
 - Use only synthetic/sample papers or open-access papers.
-- Use Google ADK for agent and tool orchestration.
+- Expose a Google ADK-facing wrapper for agent and tool orchestration.
 - Use Streamlit only for the UI/dashboard.
-- Use SQLite or DuckDB for structured storage.
+- Use SQLite for structured storage.
 - Use NetworkX for the knowledge graph.
 - Use pytest for code tests.
 - Add safety checks for prompt injection in papers, unsupported claims, fake citations, and overclaiming.
 
-## Planned Folder Structure
+## Rubric Alignment At A Glance
+
+- **Problem and value:** small research teams need faster paper comparison without
+  losing grounding, inventing citations, or presenting speculation as fact.
+- **Solution:** a local pipeline turns 5-10 permitted PDFs into structured statements,
+  a SQLite-backed evidence store, a NetworkX graph, ranked gaps, speculative
+  hypotheses, experiment plans, and safety/evaluation reports.
+- **Agent value:** the ADK-facing layer exposes deterministic tools, policy checks,
+  evidence inspection, planned tool trajectory, and final-answer constraints so the
+  workflow is inspectable rather than a black-box summary.
+- **Architecture:** the Mermaid diagram above and the `Pipeline Trace` tab show the
+  local flow from PDFs to extraction, storage, graph, discovery, safety, and UI.
+- **Setup and demo:** `make demo`, `make preflight`, `make validate`, `make ui`, and
+  `make mcp` reproduce the judge-facing demo locally.
+- **Images and artifacts:** screenshots live in `docs/screenshots/`, and sample
+  output excerpts live in `docs/sample_outputs/`.
+- **Limitations:** there is no public cloud deployment, no model training, no
+  deterministic LLM call path, no broad web search, and generated hypotheses require
+  human review.
+
+## Repository Structure
 
 ```text
 research-navigator-agent/
@@ -181,7 +201,7 @@ research-navigator-agent/
 │   ├── agents/                  # Agent definitions and orchestration
 │   ├── tools/                   # ADK tools for ingestion, extraction, graph, retrieval, safety
 │   ├── schemas/                 # Pydantic models for extracted paper structures
-│   ├── storage/                 # SQLite or DuckDB access layer
+│   ├── storage/                 # SQLite access layer
 │   ├── graph/                   # NetworkX graph construction and queries
 │   └── safety/                  # Prompt-injection, citation, grounding, and overclaim checks
 ├── ui/                          # Streamlit dashboard
@@ -203,7 +223,7 @@ research-navigator-agent/
 
 1. Load a small local paper set from `data/papers/`.
 2. Extract structured records for claims, methods, datasets, results, limitations, and future work.
-3. Store extracted records in SQLite or DuckDB.
+3. Store extracted records in SQLite.
 4. Build a NetworkX knowledge graph from papers, entities, and relationships.
 5. Run safety and grounding checks on extracted and generated content.
 6. Identify gaps, propose hypotheses, and draft experiment plans.
