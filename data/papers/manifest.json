@@ -1,0 +1,47 @@
+{
+  "corpus_scope": "MVP local corpus for ResearchNavigator Agent",
+  "license_requirement": "Use only synthetic, sample, or open-access papers. Verify source rights before adding new PDFs.",
+  "papers": [
+    {
+      "filename": "paper_01.pdf",
+      "paper_id": "paper_01",
+      "title": "Local MVP paper 01",
+      "source_type": "local",
+      "license_notes": "Verify open-access or synthetic status before external sharing.",
+      "topic": "research discovery"
+    },
+    {
+      "filename": "paper_02.pdf",
+      "paper_id": "paper_02",
+      "title": "Local MVP paper 02",
+      "source_type": "local",
+      "license_notes": "Verify open-access or synthetic status before external sharing.",
+      "topic": "research discovery"
+    },
+    {
+      "filename": "paper_03.pdf",
+      "paper_id": "paper_03",
+      "title": "Local MVP paper 03",
+      "source_type": "local",
+      "license_notes": "Verify open-access or synthetic status before external sharing.",
+      "topic": "research discovery"
+    },
+    {
+      "filename": "paper_04.pdf",
+      "paper_id": "paper_04",
+      "title": "Local MVP paper 04",
+      "source_type": "local",
+      "license_notes": "Verify open-access or synthetic status before external sharing.",
+      "topic": "research discovery"
+    },
+    {
+      "filename": "paper_05.pdf",
+      "paper_id": "paper_05",
+      "title": "Local MVP paper 05",
+      "source_type": "local",
+      "license_notes": "Verify open-access or synthetic status before external sharing.",
+      "topic": "research discovery"
+    }
+  ]
+}
+

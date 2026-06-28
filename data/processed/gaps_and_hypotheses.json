@@ -1,0 +1,424 @@
+{
+  "counts": {
+    "experiment_plans": 10,
+    "gaps": 10,
+    "hypotheses": 10,
+    "statements": 395
+  },
+  "experiment_plans": [
+    {
+      "hypothesis_id": "hyp_6ab9de7578f6",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_44fc750e64be will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_44fc750e64be.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_9657c48b2eee",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_47e4edbd51f6 will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_47e4edbd51f6.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_88b006d15c32",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_914aa32ddc3c will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_914aa32ddc3c.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_2daa5f2f0669",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_997395e9fe9d will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_997395e9fe9d.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_9cba4b73fc9c",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_b688b1aa8f57 will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_b688b1aa8f57.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_8f0fea0f7b86",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_c5cdd4026eee will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_c5cdd4026eee.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_b28e181ef881",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cc2de2e1a8af will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_cc2de2e1a8af.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_66af7505a336",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cceb3f0d23da will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_cceb3f0d23da.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_da44f5018cc7",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cddc6b7cb154 will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_cddc6b7cb154.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    },
+    {
+      "hypothesis_id": "hyp_5c0d6267fced",
+      "plan": {
+        "baseline_or_control": "Use the original reported approach, dataset, or no-intervention condition as the baseline/control where available.",
+        "expected_outcome": "The hypothesis would be supported only if measured outcomes improve or clarify the limitation under a predefined evaluation protocol.",
+        "method": "Compare an intervention or analysis designed to address the gap against the current method or reported setup.",
+        "metrics": [
+          "task-specific performance metric",
+          "robustness or generalization metric",
+          "evidence coverage against source statements"
+        ],
+        "objective": "Test the candidate hypothesis: A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_f153c8fcc479 will clarify whether the reported limitation changes under a controlled evaluation.",
+        "required_data": "Use local, open-access or synthetic data linked to the source statements for gap gap_f153c8fcc479.",
+        "risks_and_limitations": "This plan is speculative and may be limited by small samples, synthetic data, dataset shift, or incomplete source evidence."
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "evidence_text": [
+        "Finite difference methods often become unreliable when data are sparse, noisy, or coarsely resolved, particularly for higher-order derivatives; related limitations of conventional discretizations have also motivated learned numerical rep..."
+      ],
+      "gap_id": "gap_914aa32ddc3c",
+      "gap_text": "A possible research gap is suggested by a reported limitation: Finite difference methods often become unreliable when data are sparse, noisy, or coarsely resolved, particularly for higher-order derivatives; related limitations of conventional discretizations have also motivated learned numerical repres",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_1af64306e451"
+      ]
+    },
+    {
+      "evidence_text": [
+        "However, these methods that rely on a predefined library of candidate terms often face limitations in flexibility and expres"
+      ],
+      "gap_id": "gap_b688b1aa8f57",
+      "gap_text": "A possible research gap is suggested by a reported limitation: However, these methods that rely on a predefined library of candidate terms often face limitations in flexibility and expres",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_6306e96b5938"
+      ]
+    },
+    {
+      "evidence_text": [
+        "Expanding the candidate library is a possible solution, but it cannot guarantee completeness and adds complexity to the sparse identification process."
+      ],
+      "gap_id": "gap_cceb3f0d23da",
+      "gap_text": "A possible research gap is suggested by a reported limitation: Expanding the candidate library is a possible solution, but it cannot guarantee completeness and adds complexity to the sparse identification process.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_7a98ada1c181"
+      ]
+    },
+    {
+      "evidence_text": [
+        "This limitation is not primarily due to the omission of particular operators, since additional functions can often be incorporated into the library."
+      ],
+      "gap_id": "gap_f153c8fcc479",
+      "gap_text": "A possible research gap is suggested by a reported limitation: This limitation is not primarily due to the omission of particular operators, since additional functions can often be incorporated into the library.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_e49582cd1b3b"
+      ]
+    },
+    {
+      "evidence_text": [
+        "Unless such motifs are already encoded in the candidate library or genetic fragments, they cannot emerge naturally through recombination."
+      ],
+      "gap_id": "gap_cddc6b7cb154",
+      "gap_text": "A possible research gap is suggested by a reported limitation: Unless such motifs are already encoded in the candidate library or genetic fragments, they cannot emerge naturally through recombination.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_6478efcf2094"
+      ]
+    },
+    {
+      "evidence_text": [
+        "The limitation is therefore intrinsic to the representational basis itself."
+      ],
+      "gap_id": "gap_47e4edbd51f6",
+      "gap_text": "A possible research gap is suggested by a reported limitation: The limitation is therefore intrinsic to the representational basis itself.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_51ddb885f3d2"
+      ]
+    },
+    {
+      "evidence_text": [
+        "MechNNPDE 75 leverages neural architectures to adaptively select and weight candidate terms, enabling the identification of governing equations beyond the limitations of fixed libraries."
+      ],
+      "gap_id": "gap_44fc750e64be",
+      "gap_text": "A possible research gap is suggested by a reported limitation: MechNNPDE 75 leverages neural architectures to adaptively select and weight candidate terms, enabling the identification of governing equations beyond the limitations of fixed libraries.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_d1b656012d31"
+      ]
+    },
+    {
+      "evidence_text": [
+        "These coefficients may be broadly categorized into three classes: constant coefficients, coefficients expressible as deterministic functions of space or time, and coefficients that cannot be represented through explicit functional relati..."
+      ],
+      "gap_id": "gap_cc2de2e1a8af",
+      "gap_text": "A possible research gap is suggested by a reported limitation: These coefficients may be broadly categorized into three classes: constant coefficients, coefficients expressible as deterministic functions of space or time, and coefficients that cannot be represented through explicit functional relations",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_f00a3a48907e"
+      ]
+    },
+    {
+      "evidence_text": [
+        "In such cases, discovery methods must account for variability that cannot be captured by a single deterministic operator, further complicating the inference process."
+      ],
+      "gap_id": "gap_997395e9fe9d",
+      "gap_text": "A possible research gap is suggested by a reported limitation: In such cases, discovery methods must account for variability that cannot be captured by a single deterministic operator, further complicating the inference process.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_dd0d73f41ac7"
+      ]
+    },
+    {
+      "evidence_text": [
+        "In this sense, part of what is labeled as noise may in fact correspond to structure that the current representation cannot yet recover."
+      ],
+      "gap_id": "gap_c5cdd4026eee",
+      "gap_text": "A possible research gap is suggested by a reported limitation: In this sense, part of what is labeled as noise may in fact correspond to structure that the current representation cannot yet recover.",
+      "gap_type": "limitation",
+      "paper_ids": [
+        "paper_01"
+      ],
+      "source_statement_ids": [
+        "stmt_f88b79d4c162"
+      ]
+    }
+  ],
+  "hypotheses": [
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_d1b656012d31"
+      ],
+      "gap_id": "gap_44fc750e64be",
+      "hypothesis_id": "hyp_6ab9de7578f6",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_44fc750e64be will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_51ddb885f3d2"
+      ],
+      "gap_id": "gap_47e4edbd51f6",
+      "hypothesis_id": "hyp_9657c48b2eee",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_47e4edbd51f6 will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_1af64306e451"
+      ],
+      "gap_id": "gap_914aa32ddc3c",
+      "hypothesis_id": "hyp_88b006d15c32",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_914aa32ddc3c will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_dd0d73f41ac7"
+      ],
+      "gap_id": "gap_997395e9fe9d",
+      "hypothesis_id": "hyp_2daa5f2f0669",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_997395e9fe9d will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_6306e96b5938"
+      ],
+      "gap_id": "gap_b688b1aa8f57",
+      "hypothesis_id": "hyp_9cba4b73fc9c",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_b688b1aa8f57 will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_f88b79d4c162"
+      ],
+      "gap_id": "gap_c5cdd4026eee",
+      "hypothesis_id": "hyp_8f0fea0f7b86",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_c5cdd4026eee will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_f00a3a48907e"
+      ],
+      "gap_id": "gap_cc2de2e1a8af",
+      "hypothesis_id": "hyp_b28e181ef881",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cc2de2e1a8af will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_7a98ada1c181"
+      ],
+      "gap_id": "gap_cceb3f0d23da",
+      "hypothesis_id": "hyp_66af7505a336",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cceb3f0d23da will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_6478efcf2094"
+      ],
+      "gap_id": "gap_cddc6b7cb154",
+      "hypothesis_id": "hyp_da44f5018cc7",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_cddc6b7cb154 will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_e49582cd1b3b"
+      ],
+      "gap_id": "gap_f153c8fcc479",
+      "hypothesis_id": "hyp_5c0d6267fced",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_f153c8fcc479 will clarify whether the reported limitation changes under a controlled evaluation.",
+      "rationale": "This hypothesis is generated from local evidence linked to the gap and should be treated as a candidate for testing, not as a proven finding.",
+      "safety_label": "speculative_research_hypothesis"
+    }
+  ]
+}

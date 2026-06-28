@@ -1,0 +1,252 @@
+{
+  "checks": [
+    {
+      "category": "environment",
+      "message": "Project root found: .",
+      "name": "project_root",
+      "status": "pass"
+    },
+    {
+      "category": "environment",
+      "message": "Python 3.11 detected; project requires Python 3.11+.",
+      "name": "python_version",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "google.adk",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "networkx",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "pandas",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "pydantic",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "pypdf",
+      "status": "pass"
+    },
+    {
+      "category": "dependency",
+      "message": "Import succeeded.",
+      "name": "streamlit",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "README.md",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/adk_tools.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/agent.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/schemas/__init__.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/schemas/discovery.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/schemas/evaluation.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/schemas/paper.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "app/schemas/statement.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "configs/default.yaml",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "pyproject.toml",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/build_graph.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/discover_gaps.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/evaluate_outputs.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/ingest_papers.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/run_demo.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "scripts/validate_submission.py",
+      "status": "pass"
+    },
+    {
+      "category": "project_file",
+      "message": "Required file exists.",
+      "name": "ui/streamlit_app.py",
+      "status": "pass"
+    },
+    {
+      "category": "config",
+      "message": "Config version 1 loaded.",
+      "name": "configs/default.yaml",
+      "status": "pass"
+    },
+    {
+      "category": "input_data",
+      "message": "Found 5 local PDFs; recommended MVP range is 5-10.",
+      "name": "data/papers",
+      "status": "pass"
+    },
+    {
+      "category": "processed_artifact",
+      "message": "Processed artifact exists.",
+      "name": "data/processed/evaluation_report.json",
+      "status": "pass"
+    },
+    {
+      "category": "processed_artifact",
+      "message": "Processed artifact exists.",
+      "name": "data/processed/gaps_and_hypotheses.json",
+      "status": "pass"
+    },
+    {
+      "category": "processed_artifact",
+      "message": "Processed artifact exists.",
+      "name": "data/processed/papers.sqlite",
+      "status": "pass"
+    },
+    {
+      "category": "processed_artifact",
+      "message": "Processed artifact exists.",
+      "name": "data/processed/research_graph.graphml",
+      "status": "pass"
+    },
+    {
+      "category": "database",
+      "message": "Papers stored: 5.",
+      "name": "papers",
+      "status": "pass"
+    },
+    {
+      "category": "database",
+      "message": "Chunks stored: 649.",
+      "name": "chunks",
+      "status": "pass"
+    },
+    {
+      "category": "database",
+      "message": "Statements stored: 395.",
+      "name": "statements",
+      "status": "pass"
+    },
+    {
+      "category": "performance",
+      "message": "Graph nodes from current statements: 795.",
+      "name": "graph_size",
+      "status": "pass"
+    },
+    {
+      "category": "graph",
+      "message": "Nodes: 795.",
+      "name": "nodes",
+      "status": "pass"
+    },
+    {
+      "category": "graph",
+      "message": "Edges: 1052.",
+      "name": "edges",
+      "status": "pass"
+    },
+    {
+      "category": "schema",
+      "message": "Discovery counts match payload lengths.",
+      "name": "data/processed/gaps_and_hypotheses.json",
+      "status": "pass"
+    },
+    {
+      "category": "evaluation",
+      "message": "Failed evaluation checks: 0.",
+      "name": "failed_checks",
+      "status": "pass"
+    },
+    {
+      "category": "evaluation",
+      "message": "Overall score: 0.917.",
+      "name": "overall_score",
+      "status": "pass"
+    }
+  ],
+  "next_command": "make validate && make ui",
+  "ready": true,
+  "summary": {
+    "failed": 0,
+    "passed": 40,
+    "total": 40,
+    "warnings": 0
+  }
+}

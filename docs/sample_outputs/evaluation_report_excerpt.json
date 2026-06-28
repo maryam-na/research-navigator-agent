@@ -1,0 +1,27 @@
+{
+  "failed_checks": [],
+  "grounding_score": 0.78,
+  "metric_details": {
+    "paper_count": 5,
+    "plan_specificity_score": 0.55,
+    "statement_count": 395,
+    "unique_evidence_statement_count": 10
+  },
+  "overall_score": 0.917,
+  "safety_score": 1.0,
+  "testability_score": 0.932,
+  "total_experiment_plans": 10,
+  "total_gaps": 10,
+  "total_hypotheses": 10,
+  "traceability_score": 1.0,
+  "warnings": [
+    {
+      "level": "info",
+      "message": "Evidence currently comes from one paper or fewer."
+    },
+    {
+      "level": "info",
+      "message": "Experiment plans are structurally complete but still generic."
+    }
+  ]
+}

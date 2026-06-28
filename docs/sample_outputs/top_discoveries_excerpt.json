@@ -1,0 +1,66 @@
+{
+  "counts": {
+    "experiment_plans": 10,
+    "gaps": 10,
+    "hypotheses": 10,
+    "statements": 395
+  },
+  "top_gaps": [
+    {
+      "gap_id": "gap_914aa32ddc3c",
+      "gap_text": "A possible research gap is suggested by a reported limitation: Finite difference methods often become unreliable when data are sparse, noisy, or coarsely resolved, particularly for higher-order derivatives; related limitations of conventional discretizations have also motivated learned numerical repres",
+      "gap_type": "limitation",
+      "source_statement_ids": [
+        "stmt_1af64306e451"
+      ]
+    },
+    {
+      "gap_id": "gap_b688b1aa8f57",
+      "gap_text": "A possible research gap is suggested by a reported limitation: However, these methods that rely on a predefined library of candidate terms often face limitations in flexibility and expres",
+      "gap_type": "limitation",
+      "source_statement_ids": [
+        "stmt_6306e96b5938"
+      ]
+    },
+    {
+      "gap_id": "gap_cceb3f0d23da",
+      "gap_text": "A possible research gap is suggested by a reported limitation: Expanding the candidate library is a possible solution, but it cannot guarantee completeness and adds complexity to the sparse identification process.",
+      "gap_type": "limitation",
+      "source_statement_ids": [
+        "stmt_7a98ada1c181"
+      ]
+    }
+  ],
+  "top_hypotheses": [
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_d1b656012d31"
+      ],
+      "gap_id": "gap_44fc750e64be",
+      "hypothesis_id": "hyp_6ab9de7578f6",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_44fc750e64be will clarify whether the reported limitation changes under a controlled evaluation.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_51ddb885f3d2"
+      ],
+      "gap_id": "gap_47e4edbd51f6",
+      "hypothesis_id": "hyp_9657c48b2eee",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_47e4edbd51f6 will clarify whether the reported limitation changes under a controlled evaluation.",
+      "safety_label": "speculative_research_hypothesis"
+    },
+    {
+      "confidence_level": "low",
+      "evidence_statement_ids": [
+        "stmt_1af64306e451"
+      ],
+      "gap_id": "gap_914aa32ddc3c",
+      "hypothesis_id": "hyp_88b006d15c32",
+      "hypothesis_text": "A testable hypothesis could be that a targeted follow-up experiment addressing gap gap_914aa32ddc3c will clarify whether the reported limitation changes under a controlled evaluation.",
+      "safety_label": "speculative_research_hypothesis"
+    }
+  ]
+}

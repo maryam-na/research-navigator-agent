@@ -1,0 +1,366 @@
+{
+  "checks": [
+    {
+      "category": "dependency_file",
+      "message": "uv.lock exists and is parseable.",
+      "name": "uv.lock",
+      "status": "pass"
+    },
+    {
+      "category": "runtime_dependency",
+      "message": "Core MVP dependencies are declared.",
+      "name": "expected_core_stack",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 1.5.4.",
+      "name": "duckdb",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 2.3.0.",
+      "name": "google-adk",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 4.26.0.",
+      "name": "jsonschema",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 1.28.0.",
+      "name": "mcp",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 2.1.0.",
+      "name": "mypy",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 3.6.1.",
+      "name": "networkx",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 3.0.3.",
+      "name": "pandas",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 2.13.4.",
+      "name": "pydantic",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 6.14.1.",
+      "name": "pypdf",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 9.1.1.",
+      "name": "pytest",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 7.1.0.",
+      "name": "pytest-cov",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 1.2.2.",
+      "name": "python-dotenv",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 15.0.0.",
+      "name": "rich",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 0.15.18.",
+      "name": "ruff",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 1.58.0.",
+      "name": "streamlit",
+      "status": "pass"
+    },
+    {
+      "category": "lock_coverage",
+      "message": "Locked at 0.26.7.",
+      "name": "typer",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:duckdb",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:google-adk",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:mcp",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:networkx",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:pandas",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:pydantic",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:pypdf",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:python-dotenv",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:rich",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:streamlit",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "runtime:typer",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "dev:mypy",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "dev:pytest",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "dev:pytest-cov",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "dev:ruff",
+      "status": "pass"
+    },
+    {
+      "category": "version_specifier",
+      "message": "Dependency has a lower bound or exact pin.",
+      "name": "eval:jsonschema",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "No direct import detected in app/tools/scripts/ui/tests; keep only if intentionally planned.",
+      "name": "duckdb",
+      "status": "warn"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): google.",
+      "name": "google-adk",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): mcp.",
+      "name": "mcp",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): networkx.",
+      "name": "networkx",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): pandas.",
+      "name": "pandas",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): pydantic.",
+      "name": "pydantic",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): pypdf.",
+      "name": "pypdf",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "No direct import detected in app/tools/scripts/ui/tests; keep only if intentionally planned.",
+      "name": "python-dotenv",
+      "status": "warn"
+    },
+    {
+      "category": "direct_usage",
+      "message": "No direct import detected in app/tools/scripts/ui/tests; keep only if intentionally planned.",
+      "name": "rich",
+      "status": "warn"
+    },
+    {
+      "category": "direct_usage",
+      "message": "Detected import module(s): streamlit.",
+      "name": "streamlit",
+      "status": "pass"
+    },
+    {
+      "category": "direct_usage",
+      "message": "No direct import detected in app/tools/scripts/ui/tests; keep only if intentionally planned.",
+      "name": "typer",
+      "status": "warn"
+    },
+    {
+      "category": "optional_usage",
+      "message": "Optional dependency belongs to `dev` tooling and is not required at runtime.",
+      "name": "dev:mypy",
+      "status": "pass"
+    },
+    {
+      "category": "optional_usage",
+      "message": "Detected import module(s): pytest.",
+      "name": "dev:pytest",
+      "status": "pass"
+    },
+    {
+      "category": "optional_usage",
+      "message": "Optional dependency belongs to `dev` tooling and is not required at runtime.",
+      "name": "dev:pytest-cov",
+      "status": "pass"
+    },
+    {
+      "category": "optional_usage",
+      "message": "Optional dependency belongs to `dev` tooling and is not required at runtime.",
+      "name": "dev:ruff",
+      "status": "pass"
+    },
+    {
+      "category": "optional_usage",
+      "message": "Optional dependency belongs to `eval` tooling and is not required at runtime.",
+      "name": "eval:jsonschema",
+      "status": "warn"
+    },
+    {
+      "category": "local_first_risk",
+      "message": "No risky cloud/model-provider SDKs are declared as direct runtime dependencies.",
+      "name": "cloud_or_training_sdks",
+      "status": "pass"
+    },
+    {
+      "category": "dependency_size",
+      "message": "Runtime direct dependency count: 11.",
+      "name": "runtime_direct_count",
+      "status": "pass"
+    },
+    {
+      "category": "dependency_size",
+      "message": "Optional direct dependency count: 5.",
+      "name": "optional_direct_count",
+      "status": "pass"
+    },
+    {
+      "category": "dependency_size",
+      "message": "Locked package count: 101.",
+      "name": "locked_package_count",
+      "status": "pass"
+    }
+  ],
+  "dependencies": {
+    "locked_package_count": 101,
+    "optional_direct": {
+      "dev": [
+        "mypy",
+        "pytest",
+        "pytest-cov",
+        "ruff"
+      ],
+      "eval": [
+        "jsonschema"
+      ]
+    },
+    "runtime_direct": [
+      "duckdb",
+      "google-adk",
+      "mcp",
+      "networkx",
+      "pandas",
+      "pydantic",
+      "pypdf",
+      "python-dotenv",
+      "rich",
+      "streamlit",
+      "typer"
+    ]
+  },
+  "project_root": ".",
+  "ready": true,
+  "recommendations": [
+    "Review unused direct runtime dependencies before final submission: duckdb, python-dotenv, rich, typer."
+  ],
+  "summary": {
+    "failed": 0,
+    "passed": 49,
+    "total": 54,
+    "warnings": 5
+  }
+}

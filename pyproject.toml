@@ -1,0 +1,64 @@
+[project]
+name = "research-navigator-agent"
+version = "0.1.0"
+description = "Local-first Google ADK research-discovery assistant for extracting structured knowledge from small scientific paper corpora."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Maryam" }
+]
+dependencies = [
+  "google-adk>=1.0.0",
+  "streamlit>=1.36.0",
+  "pydantic>=2.8.0",
+  "duckdb>=1.0.0",
+  "networkx>=3.3",
+  "pypdf>=4.2.0",
+  "python-dotenv>=1.0.1",
+  "pandas>=2.2.0",
+  "typer>=0.12.0",
+  "rich>=13.7.0",
+  "mcp>=1.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.5.0",
+  "mypy>=1.10.0"
+]
+eval = [
+  "jsonschema>=4.22.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_return_any = true
+warn_unused_ignores = true
+strict_optional = true
+
+[tool.coverage.run]
+source = ["app", "tools", "scripts", "ui"]
+omit = [
+  "tests/*",
+  ".venv/*"
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

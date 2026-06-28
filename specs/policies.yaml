@@ -1,0 +1,67 @@
+version: 1
+default_environment: localhost
+default_role: researcher
+
+environments:
+  localhost:
+    blocked_tools:
+      - send_email
+      - deploy_cloud
+      - external_web_search
+      - train_model
+      - fine_tune_model
+      - write_outside_workspace
+  demo:
+    blocked_tools:
+      - send_email
+      - deploy_cloud
+      - train_model
+      - fine_tune_model
+
+roles:
+  viewer:
+    allowed_tools:
+      - load_processed_data
+      - search_statements
+      - search_gaps
+      - search_hypotheses
+      - view_dashboard
+  researcher:
+    allowed_tools:
+      - extract_pdf_text
+      - chunk_text
+      - initialize_database
+      - save_paper
+      - save_chunk
+      - save_statement
+      - get_papers
+      - get_chunks
+      - get_statements
+      - extract_research_statements
+      - filter_statements
+      - build_research_graph
+      - discover_research_gaps
+      - generate_hypotheses
+      - generate_experiment_plan
+      - evaluate_outputs
+      - load_processed_data
+      - search_statements
+      - search_gaps
+      - search_hypotheses
+      - view_dashboard
+  maintainer:
+    allowed_tools:
+      - "*"
+
+sensitive_patterns:
+  - email_address
+  - api_key
+  - private_url
+  - absolute_home_path
+
+human_review_required:
+  - adding_new_papers
+  - exporting_reports
+  - changing_policy
+  - enabling_llm_calls
+  - expanding_beyond_mvp_corpus

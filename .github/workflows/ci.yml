@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Local deterministic checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Lint correctness
+        run: make lint
+
+      - name: Typecheck source modules
+        run: make typecheck
+
+      - name: Run tests
+        run: make test
+
+      - name: Run golden evaluations
+        run: make eval
+
+      - name: Validate submission readiness
+        run: make validate

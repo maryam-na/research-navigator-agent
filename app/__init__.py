@@ -1,0 +1,2 @@
+"""ResearchNavigator ADK-facing package."""
+

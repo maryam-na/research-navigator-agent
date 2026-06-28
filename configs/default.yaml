@@ -1,0 +1,27 @@
+version: 1
+
+paths:
+  papers_dir: data/papers
+  db_path: data/processed/papers.sqlite
+  graph_path: data/processed/research_graph.graphml
+  discovery_path: data/processed/gaps_and_hypotheses.json
+  evaluation_path: data/processed/evaluation_report.json
+  golden_eval_path: data/processed/golden_eval_report.json
+  brief_path: data/processed/researchnavigator_brief.md
+  sample_outputs_dir: docs/sample_outputs
+  screenshots_dir: docs/screenshots
+
+pipeline:
+  max_statements_per_type_per_paper: 30
+  max_gaps: 10
+  max_hypotheses: 10
+  max_graph_nodes: 3000
+  allow_graph_truncate: false
+
+evaluation:
+  min_overall_score: 0.75
+  min_golden_pass_rate: 1.0
+
+ui:
+  default_search_query: limitations evaluation dataset
+  max_search_results: 30
