@@ -53,6 +53,8 @@ DEFAULT_DISCOVERY_PATH = Path("data/processed/gaps_and_hypotheses.json")
 DEFAULT_EVALUATION_PATH = Path("data/processed/evaluation_report.json")
 STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "dataset", "background"]
 RESULT_TYPES = ["all", "statements", "gaps", "hypotheses", "experiment_plans"]
+SELECTED_EVIDENCE_KEY = "selected_evidence_statement_id"
+SELECTED_EVIDENCE_SOURCE_KEY = "selected_evidence_source"
 PIPELINE_COMMANDS = [
     "uv run python -m scripts.ingest_papers --papers-dir data/papers --db-path data/processed/papers.sqlite --extract-statements --filter-statements --max-statements-per-type-per-paper 30",
     "uv run python -m scripts.build_graph --db-path data/processed/papers.sqlite --graph-path data/processed/research_graph.graphml",
@@ -576,6 +578,98 @@ def _metric_cards(items: list[tuple[str, object]], columns: int = 4) -> None:
     st.markdown(f'<div class="rn-metric-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
+def _statement_records(statements: pd.DataFrame | list[dict]) -> list[dict]:
+    if isinstance(statements, pd.DataFrame):
+        return statements.to_dict("records")
+    return list(statements)
+
+
+def _statement_lookup_from_data(data: dict) -> dict[str, dict]:
+    return {
+        str(statement.get("statement_id", "")): statement
+        for statement in _statement_records(data.get("statements", pd.DataFrame()))
+        if statement.get("statement_id")
+    }
+
+
+def _unique_statement_ids(statement_ids: list[object]) -> list[str]:
+    unique_ids = []
+    seen: set[str] = set()
+    for statement_id in statement_ids:
+        normalized = str(statement_id or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_ids.append(normalized)
+    return unique_ids
+
+
+def _evidence_statement_ids_for_result(result: dict, data: dict) -> list[str]:
+    candidates: list[object] = []
+    if result.get("statement_id"):
+        candidates.append(result["statement_id"])
+    if result.get("evidence_statement_ids"):
+        candidates.extend(result.get("evidence_statement_ids", []))
+    related = get_related_items(
+        result,
+        data.get("gaps", []),
+        data.get("hypotheses", []),
+        data.get("experiment_plans", []),
+    )
+    for gap in related["gaps"]:
+        candidates.extend(gap.get("source_statement_ids", []))
+    for hypothesis in related["hypotheses"]:
+        candidates.extend(hypothesis.get("evidence_statement_ids", []))
+    return _unique_statement_ids(candidates)
+
+
+def _available_statement_ids(statement_ids: list[str], data: dict) -> list[str]:
+    lookup = _statement_lookup_from_data(data)
+    return [statement_id for statement_id in statement_ids if statement_id in lookup]
+
+
+def _statement_option_label(statement: dict, max_chars: int = 86) -> str:
+    statement_id = str(statement.get("statement_id", ""))
+    statement_type = str(statement.get("statement_type", "statement")) or "statement"
+    paper_id = str(statement.get("paper_id", "unknown paper")) or "unknown paper"
+    text = str(statement.get("statement_text") or statement.get("evidence_text") or "")
+    preview = " ".join(text.split())
+    if len(preview) > max_chars:
+        preview = preview[: max_chars - 3].rstrip() + "..."
+    if not preview:
+        preview = "No statement preview available"
+    return f"{statement_type} | {paper_id} | {preview} ({statement_id})"
+
+
+def _select_evidence_statement(statement_id: str, source_label: str) -> None:
+    st.session_state[SELECTED_EVIDENCE_KEY] = statement_id
+    st.session_state[SELECTED_EVIDENCE_SOURCE_KEY] = source_label
+
+
+def _render_evidence_action(
+    statement_ids: list[str],
+    data: dict,
+    source_label: str,
+    key: str,
+    *,
+    show_missing: bool = True,
+) -> None:
+    available_ids = _available_statement_ids(statement_ids, data)
+    if not statement_ids:
+        if show_missing:
+            st.caption("No linked statement evidence found.")
+        return
+    if not available_ids:
+        st.caption("Linked evidence IDs are not available in the current statement table.")
+        return
+    target_id = available_ids[0]
+    if st.button("Inspect evidence", key=key):
+        _select_evidence_statement(target_id, source_label)
+        st.success("Evidence selected. Open the Evidence Inspector tab to review it.")
+    if len(available_ids) > 1:
+        st.caption(f"{len(available_ids)} evidence statements linked; the first is selected.")
+
+
 def _render_corpus_setup() -> None:
     _section_header(
         "Local PDF corpus setup",
@@ -679,7 +773,7 @@ def _render_corpus_status_message(status: dict) -> None:
         st.warning("Manifest review needed before the final submission check.")
 
 
-def _result_card(result: dict, data: dict) -> None:
+def _result_card(result: dict, data: dict, card_index: int = 0) -> None:
     related = get_related_items(
         result,
         data.get("gaps", []),
@@ -707,6 +801,16 @@ def _result_card(result: dict, data: dict) -> None:
             + html.escape(" | ".join(f"{key}: {value}" for key, value in meta.items() if value))
             + "</div>",
             unsafe_allow_html=True,
+        )
+        result_type = result.get("result_type", "result")
+        result_title = result.get("title", result.get("result_id", ""))
+        result_id = result.get("result_id", "")
+        _render_evidence_action(
+            _evidence_statement_ids_for_result(result, data),
+            data,
+            f"{result_type}: {result_title}",
+            f"inspect-search-{card_index}-{result_type}-{result_id}",
+            show_missing=result.get("result_type") != "paper",
         )
         with st.expander("Open details"):
             st.json(
@@ -1072,8 +1176,8 @@ def main() -> None:
             _discovery_summary(results)
             if not results:
                 st.info("No local matches found. Try a broader keyword or run the processing pipeline.")
-            for result in results[:30]:
-                _result_card(result, data)
+            for result_index, result in enumerate(results[:30]):
+                _result_card(result, data, result_index)
         else:
             st.markdown(
                 """
@@ -1098,9 +1202,35 @@ def main() -> None:
         if statements.empty:
             st.info("No statements are available yet. Run ingestion with statement extraction first.")
         else:
-            statement_ids = sorted(str(item) for item in statements["statement_id"].dropna().unique())
-            selected_statement_id = st.selectbox("Statement", statement_ids)
-            selected_statement = statements[statements["statement_id"] == selected_statement_id].iloc[0].to_dict()
+            statement_records = sorted(
+                _statement_records(statements),
+                key=lambda item: str(item.get("statement_id", "")),
+            )
+            statement_ids = [str(item.get("statement_id", "")) for item in statement_records]
+            statement_labels = {
+                str(item.get("statement_id", "")): _statement_option_label(item)
+                for item in statement_records
+            }
+            requested_statement_id = str(st.session_state.get(SELECTED_EVIDENCE_KEY, "") or "")
+            if requested_statement_id and requested_statement_id not in statement_ids:
+                st.warning("Selected evidence is not available in the current statement table.")
+                requested_statement_id = ""
+            selected_index = (
+                statement_ids.index(requested_statement_id) if requested_statement_id else 0
+            )
+            selected_statement_id = st.selectbox(
+                "Statement",
+                statement_ids,
+                index=selected_index,
+                format_func=lambda item: statement_labels.get(str(item), str(item)),
+            )
+            st.session_state[SELECTED_EVIDENCE_KEY] = selected_statement_id
+            selected_source = st.session_state.get(SELECTED_EVIDENCE_SOURCE_KEY)
+            if selected_source and selected_statement_id == requested_statement_id:
+                st.info(f"Selected from {selected_source}.")
+            selected_statement = (
+                statements[statements["statement_id"] == selected_statement_id].iloc[0].to_dict()
+            )
             quality = score_statement_quality(selected_statement)
             _metric_cards(
                 [
@@ -1155,6 +1285,12 @@ def main() -> None:
                     f"Rank score: {gap.get('rank_score')} | Evidence: {gap.get('evidence_count')} statements | Papers: {gap.get('paper_count')}"
                 )
                 st.write(gap.get("gap_text"))
+                _render_evidence_action(
+                    _unique_statement_ids(gap.get("source_statement_ids", [])),
+                    data,
+                    f"gap: {gap.get('gap_id', '')}",
+                    f"inspect-gap-{gap.get('gap_id', '')}",
+                )
                 with st.expander("Inspect evidence"):
                     evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
                     _render_dataframe(pd.DataFrame(evidence))
@@ -1165,6 +1301,12 @@ def main() -> None:
                 st.write(hypothesis.get("hypothesis_text"))
                 st.caption(
                     f"Gap: {hypothesis.get('gap_id')} | Confidence: {hypothesis.get('confidence_level')} | Safety: {hypothesis.get('safety_label')}"
+                )
+                _render_evidence_action(
+                    _unique_statement_ids(hypothesis.get("evidence_statement_ids", [])),
+                    data,
+                    f"hypothesis: {hypothesis.get('hypothesis_id', '')}",
+                    f"inspect-hypothesis-{hypothesis.get('hypothesis_id', '')}",
                 )
                 with st.expander("Evidence and experiment plan"):
                     evidence = evidence_for_statement_ids(hypothesis.get("evidence_statement_ids", []), data["statements"])

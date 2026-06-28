@@ -5,9 +5,12 @@ import networkx as nx
 from tools.graph_tools import export_graphml
 from tools.storage_tools import initialize_database, save_chunk, save_paper, save_statement
 from ui.streamlit_app import (
+    _available_statement_ids,
     _evaluation_caveat_items,
+    _evidence_statement_ids_for_result,
     _render_dataframe,
     _render_plotly_chart,
+    _statement_option_label,
     _subgraph_for_results,
     build_small_subgraph,
     dashboard_counts,
@@ -202,6 +205,51 @@ def test_evaluation_status_passes_only_without_failures_warnings_or_grounding_ca
     assert status["key"] == "passed"
     assert status["headline"] == "Checks passed"
     assert status["tone"] == "good"
+
+
+def test_evidence_statement_ids_for_result_prefers_direct_and_related_ids():
+    data = {
+        "statements": [
+            {"statement_id": "stmt_direct"},
+            {"statement_id": "stmt_gap"},
+            {"statement_id": "stmt_hyp"},
+        ],
+        "gaps": [{"gap_id": "gap_001", "source_statement_ids": ["stmt_gap"]}],
+        "hypotheses": [
+            {
+                "hypothesis_id": "hyp_001",
+                "gap_id": "gap_001",
+                "evidence_statement_ids": ["stmt_hyp"],
+            }
+        ],
+        "experiment_plans": [{"hypothesis_id": "hyp_001"}],
+    }
+    statement_result = {"result_type": "statement", "statement_id": "stmt_direct"}
+    plan_result = {
+        "result_type": "experiment_plan",
+        "linked_hypothesis_id": "hyp_001",
+    }
+
+    assert _evidence_statement_ids_for_result(statement_result, data) == ["stmt_direct"]
+    assert _evidence_statement_ids_for_result(plan_result, data) == ["stmt_hyp"]
+    assert _available_statement_ids(["stmt_hyp", "missing"], data) == ["stmt_hyp"]
+
+
+def test_statement_option_label_includes_type_paper_preview_and_id():
+    label = _statement_option_label(
+        {
+            "statement_id": "stmt_001",
+            "statement_type": "limitation",
+            "paper_id": "paper_001",
+            "statement_text": (
+                "This evaluation uses a narrow dataset and should be reviewed carefully."
+            ),
+        },
+        max_chars=46,
+    )
+
+    assert label.startswith("limitation | paper_001 | This evaluation uses a narrow dataset")
+    assert label.endswith("(stmt_001)")
 
 
 def test_load_json_file_reads_payload(tmp_path):
