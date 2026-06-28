@@ -9,12 +9,13 @@ from ui.data_access import (
     evidence_for_statement_ids,
     get_related_items,
     load_processed_data,
+    prepare_hypothesis_triage,
     rank_gaps,
     rank_results,
+    score_statement_quality,
     search_gaps,
     search_hypotheses,
     search_statements,
-    score_statement_quality,
 )
 
 
@@ -175,6 +176,77 @@ def test_rank_gaps_prefers_more_evidence():
 
     assert [gap["gap_id"] for gap in ranked] == ["gap_high", "gap_low"]
     assert ranked[0]["evidence_count"] == 2
+
+
+def test_rank_gaps_adds_triage_metadata_and_missing_evidence_status():
+    gaps = [
+        {
+            "gap_id": "gap_missing",
+            "gap_text": "A possible research gap is suggested by: Missing evidence.",
+            "gap_type": "limitation",
+            "source_statement_ids": [],
+        },
+        {
+            "gap_id": "gap_supported",
+            "gap_text": "A possible research gap is suggested by a reported limitation: Evaluation remains narrow.",
+            "gap_type": "result_with_limitation",
+            "source_statement_ids": ["stmt_limitation"],
+        },
+    ]
+
+    ranked = rank_gaps(gaps, sample_statements())
+    supported = ranked[0]
+    missing = ranked[1]
+
+    assert supported["gap_id"] == "gap_supported"
+    assert supported["display_label"] == "Evaluation remains narrow."
+    assert supported["evidence_status"] == "evidence-linked"
+    assert supported["rank_score_parts"]["evidence"] == 3
+    assert "evidence +3" in supported["rank_score_explanation"]
+    assert missing["evidence_status"] == "missing evidence"
+    assert missing["available_evidence_count"] == 0
+
+
+def test_prepare_hypothesis_triage_links_gap_plan_and_safety_context():
+    gaps = [
+        {
+            "gap_id": "gap_supported",
+            "gap_text": "A possible research gap is suggested by: Evaluation remains narrow.",
+            "gap_type": "result_with_limitation",
+            "source_statement_ids": ["stmt_limitation", "stmt_method"],
+        }
+    ]
+    hypotheses = [
+        {
+            "hypothesis_id": "hyp_missing",
+            "gap_id": "gap_supported",
+            "hypothesis_text": "A testable hypothesis could be that unsupported evidence should be reviewed.",
+            "confidence_level": "low",
+            "safety_label": "speculative_research_hypothesis",
+            "evidence_statement_ids": [],
+        },
+        {
+            "hypothesis_id": "hyp_supported",
+            "gap_id": "gap_supported",
+            "hypothesis_text": "A testable hypothesis could be that controlled evaluation clarifies the limitation.",
+            "confidence_level": "medium",
+            "safety_label": "speculative_research_hypothesis",
+            "evidence_statement_ids": ["stmt_limitation", "stmt_method"],
+        },
+    ]
+    plans = [{"hypothesis_id": "hyp_supported", "plan": {"objective": "Test it."}}]
+
+    triaged = prepare_hypothesis_triage(hypotheses, gaps, sample_statements(), plans)
+
+    supported = triaged[0]
+    missing = triaged[1]
+    assert supported["hypothesis_id"] == "hyp_supported"
+    assert supported["display_label"] == "Controlled evaluation clarifies the limitation."
+    assert supported["linked_gap_type"] == "result_with_limitation"
+    assert supported["experiment_plan_available"] is True
+    assert supported["evidence_status"] == "evidence-linked"
+    assert "speculative safety label" in supported["triage_score_explanation"]
+    assert missing["evidence_status"] == "missing evidence"
 
 
 def test_research_themes_are_deterministic():

@@ -11,7 +11,6 @@ from typing import Any
 import networkx as nx
 import pandas as pd
 
-
 STATEMENT_TYPE_PRIORITY = {
     "limitation": 7,
     "future_work": 6,
@@ -20,6 +19,14 @@ STATEMENT_TYPE_PRIORITY = {
     "dataset": 3,
     "background": 2,
     "unknown": 1,
+}
+
+CONFIDENCE_PRIORITY = {
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "unknown": 0,
+    "": 0,
 }
 
 STOPWORDS = {
@@ -159,28 +166,119 @@ def rank_gaps(gaps: list[dict], statements: pd.DataFrame | list[dict]) -> list[d
     ranked = []
     for gap in gaps:
         source_ids = [str(item) for item in gap.get("source_statement_ids", [])]
-        papers = sorted({str(lookup[item].get("paper_id", "")) for item in source_ids if item in lookup})
+        papers = {
+            str(item)
+            for item in gap.get("paper_ids", [])
+            if str(item)
+        }
+        papers.update(str(lookup[item].get("paper_id", "")) for item in source_ids if item in lookup)
+        papers = sorted(item for item in papers if item)
         source_types = sorted({str(lookup[item].get("statement_type", "")) for item in source_ids if item in lookup})
-        score = (
-            len(source_ids) * 3
-            + len(papers) * 2
-            + (2 if gap.get("gap_type") == "result_with_limitation" else 0)
-            + (1 if "future_work" in source_types else 0)
-            + (1 if "limitation" in source_types else 0)
-        )
+        available_evidence_count = sum(1 for item in source_ids if item in lookup)
+        score_parts = {
+            "evidence": len(source_ids) * 3,
+            "paper_coverage": len(papers) * 2,
+            "result_limitation_bonus": 2 if gap.get("gap_type") == "result_with_limitation" else 0,
+            "future_work_bonus": 1 if "future_work" in source_types else 0,
+            "limitation_bonus": 1 if "limitation" in source_types else 0,
+        }
+        score = sum(score_parts.values())
         ranked.append(
             {
                 **gap,
+                "display_label": discovery_label(str(gap.get("gap_text", "")), str(gap.get("gap_id", "Research gap"))),
                 "rank_score": score,
+                "rank_score_parts": score_parts,
+                "rank_score_explanation": _rank_score_explanation(score_parts),
                 "evidence_count": len(source_ids),
+                "available_evidence_count": available_evidence_count,
                 "paper_count": len(papers),
+                "paper_ids": papers,
                 "source_statement_types": source_types,
+                "evidence_status": _evidence_status(len(source_ids), available_evidence_count),
             }
         )
     return sorted(
         ranked,
         key=lambda item: (-int(item.get("rank_score", 0)), str(item.get("gap_id", ""))),
     )
+
+
+def prepare_hypothesis_triage(
+    hypotheses: list[dict],
+    gaps: list[dict],
+    statements: pd.DataFrame | list[dict],
+    experiment_plans: list[dict] | None = None,
+) -> list[dict]:
+    """Add deterministic triage metadata to hypotheses without changing generated text."""
+
+    lookup = statement_lookup(statements)
+    ranked_gaps = {str(item.get("gap_id", "")): item for item in rank_gaps(gaps, statements)}
+    plan_ids = {str(plan.get("hypothesis_id", "")) for plan in experiment_plans or []}
+    triaged = []
+    for hypothesis in hypotheses:
+        evidence_ids = [str(item) for item in hypothesis.get("evidence_statement_ids", [])]
+        gap_id = str(hypothesis.get("gap_id", ""))
+        linked_gap = ranked_gaps.get(gap_id, {})
+        papers = {
+            str(lookup[item].get("paper_id", ""))
+            for item in evidence_ids
+            if item in lookup
+        }
+        papers.update(str(item) for item in linked_gap.get("paper_ids", []) if str(item))
+        papers = sorted(item for item in papers if item)
+        available_evidence_count = sum(1 for item in evidence_ids if item in lookup)
+        confidence = str(hypothesis.get("confidence_level", "")).lower()
+        safety_label = str(hypothesis.get("safety_label", ""))
+        score_parts = {
+            "evidence": len(evidence_ids) * 3,
+            "paper_coverage": len(papers) * 2,
+            "confidence": CONFIDENCE_PRIORITY.get(confidence, 0) * 2,
+            "safety_label": 2 if safety_label == "speculative_research_hypothesis" else 0,
+            "experiment_plan": 1 if str(hypothesis.get("hypothesis_id", "")) in plan_ids else 0,
+        }
+        triaged.append(
+            {
+                **hypothesis,
+                "display_label": discovery_label(
+                    str(hypothesis.get("hypothesis_text", "")),
+                    str(hypothesis.get("hypothesis_id", "Hypothesis")),
+                ),
+                "linked_gap_label": linked_gap.get("display_label", gap_id),
+                "linked_gap_type": linked_gap.get("gap_type", ""),
+                "triage_score": sum(score_parts.values()),
+                "triage_score_parts": score_parts,
+                "triage_score_explanation": _hypothesis_score_explanation(score_parts),
+                "evidence_count": len(evidence_ids),
+                "available_evidence_count": available_evidence_count,
+                "paper_count": len(papers),
+                "paper_ids": papers,
+                "evidence_status": _evidence_status(len(evidence_ids), available_evidence_count),
+                "experiment_plan_available": str(hypothesis.get("hypothesis_id", "")) in plan_ids,
+            }
+        )
+    return sorted(
+        triaged,
+        key=lambda item: (-int(item.get("triage_score", 0)), str(item.get("hypothesis_id", ""))),
+    )
+
+
+def discovery_label(text: str, fallback: str = "Discovery", max_chars: int = 96) -> str:
+    """Create a readable label from generated discovery text while keeping IDs secondary."""
+
+    normalized = re.sub(r"\s+", " ", text).strip()
+    prefixes = (
+        "A possible research gap is suggested by a reported limitation:",
+        "A possible research gap is suggested by reported future work:",
+        "A possible research gap is suggested by:",
+        "A testable hypothesis could be that",
+    )
+    for prefix in prefixes:
+        if normalized.lower().startswith(prefix.lower()):
+            normalized = normalized[len(prefix):].strip()
+            break
+    normalized = normalized[:1].upper() + normalized[1:] if normalized else str(fallback)
+    return _clip_text(normalized, max_chars)
 
 
 def build_research_themes(
@@ -570,6 +668,44 @@ def search_all(query: str, data: dict[str, Any], filters: dict | None = None) ->
         key = result_type if result_type.endswith("s") else f"{result_type}s"
         return {name: values if name == key else [] for name, values in results.items()}
     return results
+
+
+def _evidence_status(evidence_count: int, available_evidence_count: int) -> str:
+    if evidence_count <= 0:
+        return "missing evidence"
+    if available_evidence_count <= 0:
+        return "evidence IDs unavailable"
+    if available_evidence_count < evidence_count:
+        return "partial evidence"
+    return "evidence-linked"
+
+
+def _rank_score_explanation(score_parts: dict[str, int]) -> str:
+    parts = [
+        f"evidence +{score_parts['evidence']}",
+        f"paper coverage +{score_parts['paper_coverage']}",
+    ]
+    if score_parts["result_limitation_bonus"]:
+        parts.append(f"result-with-limitation +{score_parts['result_limitation_bonus']}")
+    if score_parts["future_work_bonus"]:
+        parts.append(f"future-work evidence +{score_parts['future_work_bonus']}")
+    if score_parts["limitation_bonus"]:
+        parts.append(f"limitation evidence +{score_parts['limitation_bonus']}")
+    return "; ".join(parts)
+
+
+def _hypothesis_score_explanation(score_parts: dict[str, int]) -> str:
+    parts = [
+        f"evidence +{score_parts['evidence']}",
+        f"paper coverage +{score_parts['paper_coverage']}",
+    ]
+    if score_parts["confidence"]:
+        parts.append(f"confidence +{score_parts['confidence']}")
+    if score_parts["safety_label"]:
+        parts.append(f"speculative safety label +{score_parts['safety_label']}")
+    if score_parts["experiment_plan"]:
+        parts.append(f"experiment plan +{score_parts['experiment_plan']}")
+    return "; ".join(parts)
 
 
 def _empty_query(query: str) -> bool:

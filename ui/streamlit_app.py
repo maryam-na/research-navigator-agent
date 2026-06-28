@@ -36,6 +36,7 @@ from ui.data_access import (
     graph_to_tables,
     load_graph,
     load_table,
+    prepare_hypothesis_triage,
     rank_gaps,
     rank_results,
     score_statement_quality,
@@ -319,6 +320,35 @@ def _inject_global_styles() -> None:
             font-weight: 700;
             text-transform: uppercase;
         }
+        .rn-tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 7px 0 8px;
+        }
+        .rn-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid var(--rn-line);
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #334155;
+            padding: 3px 8px;
+            font-size: 0.74rem;
+            font-weight: 650;
+            max-width: 100%;
+        }
+        .rn-tag.warn {
+            border-color: #fde68a;
+            color: #92400e;
+            background: #fffbeb;
+        }
+        .rn-tag.good {
+            border-color: #99f6e4;
+            color: #115e59;
+            background: #f0fdfa;
+        }
         div[data-testid="stTabs"] div[role="tablist"] {
             gap: 4px;
             flex-wrap: wrap;
@@ -384,6 +414,10 @@ def _inject_global_styles() -> None:
             }
             .rn-review-banner ul {
                 display: none;
+            }
+            .rn-tag {
+                font-size: 0.68rem;
+                padding: 3px 6px;
             }
             div[data-testid="stTabs"] div[role="tablist"] {
                 display: grid;
@@ -1042,6 +1076,400 @@ def _discovery_summary(results: list[dict]) -> None:
     )
 
 
+def _triage_values(records: list[dict], field: str) -> list[str]:
+    values: set[str] = set()
+    for record in records:
+        value = record.get(field)
+        if isinstance(value, list):
+            values.update(str(item) for item in value if str(item))
+        elif value:
+            values.add(str(value))
+    return sorted(values)
+
+
+def _triage_query_matches(record: dict, query: str, fields: list[str]) -> bool:
+    normalized = query.strip().lower()
+    if not normalized:
+        return True
+    haystack = []
+    for field in fields:
+        value = record.get(field, "")
+        if isinstance(value, list):
+            haystack.extend(str(item) for item in value)
+        else:
+            haystack.append(str(value))
+    return normalized in " ".join(haystack).lower()
+
+
+def _filter_gap_triage(
+    gaps: list[dict],
+    query: str,
+    gap_type: str,
+    evidence_type: str,
+    evidence_status: str,
+    min_evidence: int,
+    min_papers: int,
+) -> list[dict]:
+    filtered = []
+    for gap in gaps:
+        if not _triage_query_matches(gap, query, ["gap_id", "gap_text", "display_label", "paper_ids"]):
+            continue
+        if gap_type != "all" and str(gap.get("gap_type", "")) != gap_type:
+            continue
+        if evidence_type != "all" and evidence_type not in gap.get("source_statement_types", []):
+            continue
+        if evidence_status != "all" and str(gap.get("evidence_status", "")) != evidence_status:
+            continue
+        if int(gap.get("evidence_count", 0)) < min_evidence:
+            continue
+        if int(gap.get("paper_count", 0)) < min_papers:
+            continue
+        filtered.append(gap)
+    return filtered
+
+
+def _sort_gap_triage(gaps: list[dict], sort_by: str) -> list[dict]:
+    if sort_by == "Evidence count":
+        return sorted(
+            gaps,
+            key=lambda item: (
+                -int(item.get("evidence_count", 0)),
+                -int(item.get("paper_count", 0)),
+                str(item.get("gap_id", "")),
+            ),
+        )
+    if sort_by == "Paper coverage":
+        return sorted(
+            gaps,
+            key=lambda item: (
+                -int(item.get("paper_count", 0)),
+                -int(item.get("evidence_count", 0)),
+                str(item.get("gap_id", "")),
+            ),
+        )
+    if sort_by == "Gap type":
+        return sorted(gaps, key=lambda item: (str(item.get("gap_type", "")), str(item.get("gap_id", ""))))
+    return sorted(gaps, key=lambda item: (-int(item.get("rank_score", 0)), str(item.get("gap_id", ""))))
+
+
+def _filter_hypothesis_triage(
+    hypotheses: list[dict],
+    query: str,
+    confidence: str,
+    safety_label: str,
+    gap_type: str,
+    plan_status: str,
+    min_evidence: int,
+    min_papers: int,
+) -> list[dict]:
+    filtered = []
+    for hypothesis in hypotheses:
+        if not _triage_query_matches(
+            hypothesis,
+            query,
+            ["hypothesis_id", "hypothesis_text", "display_label", "gap_id", "linked_gap_label"],
+        ):
+            continue
+        if confidence != "all" and str(hypothesis.get("confidence_level", "")) != confidence:
+            continue
+        if safety_label != "all" and str(hypothesis.get("safety_label", "")) != safety_label:
+            continue
+        if gap_type != "all" and str(hypothesis.get("linked_gap_type", "")) != gap_type:
+            continue
+        if plan_status == "with plan" and not hypothesis.get("experiment_plan_available"):
+            continue
+        if plan_status == "missing plan" and hypothesis.get("experiment_plan_available"):
+            continue
+        if int(hypothesis.get("evidence_count", 0)) < min_evidence:
+            continue
+        if int(hypothesis.get("paper_count", 0)) < min_papers:
+            continue
+        filtered.append(hypothesis)
+    return filtered
+
+
+def _sort_hypothesis_triage(hypotheses: list[dict], sort_by: str) -> list[dict]:
+    confidence_order = {"high": 3, "medium": 2, "low": 1}
+    if sort_by == "Evidence count":
+        return sorted(
+            hypotheses,
+            key=lambda item: (
+                -int(item.get("evidence_count", 0)),
+                -int(item.get("paper_count", 0)),
+                str(item.get("hypothesis_id", "")),
+            ),
+        )
+    if sort_by == "Paper coverage":
+        return sorted(
+            hypotheses,
+            key=lambda item: (
+                -int(item.get("paper_count", 0)),
+                -int(item.get("evidence_count", 0)),
+                str(item.get("hypothesis_id", "")),
+            ),
+        )
+    if sort_by == "Confidence":
+        return sorted(
+            hypotheses,
+            key=lambda item: (
+                -confidence_order.get(str(item.get("confidence_level", "")).lower(), 0),
+                -int(item.get("evidence_count", 0)),
+                str(item.get("hypothesis_id", "")),
+            ),
+        )
+    if sort_by == "Experiment plan":
+        return sorted(
+            hypotheses,
+            key=lambda item: (
+                not bool(item.get("experiment_plan_available")),
+                str(item.get("hypothesis_id", "")),
+            ),
+        )
+    return sorted(
+        hypotheses,
+        key=lambda item: (-int(item.get("triage_score", 0)), str(item.get("hypothesis_id", ""))),
+    )
+
+
+def _tag_value(value: object) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) or "none"
+    if value is None or value == "":
+        return "none"
+    return str(value).replace("_", " ")
+
+
+def _render_tag_list(tags: list[tuple[str, object, str]]) -> None:
+    html_tags = []
+    for label, value, tone in tags:
+        if value is None or value == "" or value == []:
+            continue
+        html_tags.append(
+            f'<span class="rn-tag {html.escape(tone)}">'
+            f"{html.escape(label)}: {html.escape(_tag_value(value))}</span>"
+        )
+    if html_tags:
+        st.markdown(f'<div class="rn-tag-list">{"".join(html_tags)}</div>', unsafe_allow_html=True)
+
+
+def _render_evidence_warning(record: dict, item_name: str) -> None:
+    status = str(record.get("evidence_status", ""))
+    if status == "evidence-linked":
+        return
+    if status == "partial evidence":
+        st.warning(f"Some linked evidence IDs for this {item_name} are missing from the current statement table.")
+    elif status == "evidence IDs unavailable":
+        st.warning(f"Linked evidence IDs for this {item_name} are not available in the current statement table.")
+    else:
+        st.warning(f"This {item_name} does not list local statement evidence.")
+
+
+def _plan_for_hypothesis(hypothesis_id: str, plans: list[dict]) -> dict | None:
+    for plan in plans:
+        if str(plan.get("hypothesis_id", "")) == hypothesis_id:
+            return plan.get("plan", {})
+    return None
+
+
+def _render_discoveries_tab(data: dict, counts: dict) -> None:
+    _metric_cards(
+        [
+            ("Papers", counts["papers"]),
+            ("Statements", counts["statements"]),
+            ("Gaps", counts["gaps"]),
+            ("Hypotheses", counts["hypotheses"]),
+        ],
+        columns=4,
+    )
+    st.markdown(
+        """
+        <div class="rn-callout">
+          <strong>Rank score guide</strong><br>
+          Gap score weights local evidence statements, paper coverage, result-with-limitation gaps,
+          and limitation or future-work evidence. It orders review priority; it is not a claim of
+          scientific certainty.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    ranked_gaps = rank_gaps(data["gaps"], data["statements"])
+    triaged_hypotheses = prepare_hypothesis_triage(
+        data["hypotheses"],
+        data["gaps"],
+        data["statements"],
+        data["experiment_plans"],
+    )
+
+    _section_header("Gap triage", "Filter and sort evidence-backed candidate gaps before inspecting evidence.", "Discovery")
+    if not ranked_gaps:
+        st.info("No research gaps are available yet. Run the local discovery pipeline after extracting statements.")
+    else:
+        gap_control_cols = st.columns([2, 1, 1, 1])
+        gap_query = gap_control_cols[0].text_input("Search gaps", key="gap-triage-query")
+        gap_type = gap_control_cols[1].selectbox("Gap type", ["all"] + _triage_values(ranked_gaps, "gap_type"))
+        evidence_type = gap_control_cols[2].selectbox(
+            "Evidence type",
+            ["all"] + _triage_values(ranked_gaps, "source_statement_types"),
+        )
+        gap_sort = gap_control_cols[3].selectbox(
+            "Sort gaps by",
+            ["Rank score", "Evidence count", "Paper coverage", "Gap type"],
+        )
+        gap_threshold_cols = st.columns(3)
+        max_gap_evidence = max(int(gap.get("evidence_count", 0)) for gap in ranked_gaps)
+        max_gap_papers = max(int(gap.get("paper_count", 0)) for gap in ranked_gaps)
+        min_gap_evidence = gap_threshold_cols[0].selectbox("Min gap evidence", list(range(max_gap_evidence + 1)))
+        min_gap_papers = gap_threshold_cols[1].selectbox("Min gap papers", list(range(max_gap_papers + 1)))
+        gap_status = gap_threshold_cols[2].selectbox(
+            "Evidence status",
+            ["all"] + _triage_values(ranked_gaps, "evidence_status"),
+        )
+        filtered_gaps = _sort_gap_triage(
+            _filter_gap_triage(
+                ranked_gaps,
+                gap_query,
+                gap_type,
+                evidence_type,
+                gap_status,
+                int(min_gap_evidence),
+                int(min_gap_papers),
+            ),
+            gap_sort,
+        )
+        st.caption(f"Showing {len(filtered_gaps)} of {len(ranked_gaps)} gaps.")
+        if not filtered_gaps:
+            st.info("No gaps match the current triage filters. Try broadening the search or lowering thresholds.")
+        for gap in filtered_gaps:
+            with st.container(border=True):
+                st.markdown(
+                    f"<strong>Gap:</strong> {html.escape(str(gap.get('display_label', 'Research gap')))}",
+                    unsafe_allow_html=True,
+                )
+                st.caption(f"ID: {gap.get('gap_id')} | Score: {gap.get('rank_score')}")
+                _render_tag_list(
+                    [
+                        ("type", gap.get("gap_type", "unknown"), ""),
+                        ("evidence", gap.get("evidence_count", 0), "good"),
+                        ("papers", gap.get("paper_count", 0), "good"),
+                        ("status", gap.get("evidence_status", ""), "warn" if gap.get("evidence_status") != "evidence-linked" else "good"),
+                    ]
+                )
+                st.write(gap.get("gap_text"))
+                st.caption(f"Score inputs: {gap.get('rank_score_explanation')}")
+                _render_evidence_warning(gap, "gap")
+                _render_evidence_action(
+                    _unique_statement_ids(gap.get("source_statement_ids", [])),
+                    data,
+                    f"gap: {gap.get('gap_id', '')}",
+                    f"inspect-gap-{gap.get('gap_id', '')}",
+                )
+                with st.expander("Evidence details"):
+                    evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
+                    if evidence:
+                        _render_dataframe(pd.DataFrame(evidence))
+                    else:
+                        st.warning("No matching local evidence rows were found for this gap.")
+
+    _section_header(
+        "Hypothesis triage",
+        "Compare speculative hypotheses by linked evidence, confidence, safety label, and plan readiness.",
+        "Experiment design",
+    )
+    if not triaged_hypotheses:
+        st.info("No hypotheses are available yet. Run discovery after grounded gaps are available.")
+        return
+
+    hyp_control_cols = st.columns([2, 1, 1, 1])
+    hypothesis_query = hyp_control_cols[0].text_input("Search hypotheses", key="hypothesis-triage-query")
+    confidence = hyp_control_cols[1].selectbox(
+        "Confidence",
+        ["all"] + _triage_values(triaged_hypotheses, "confidence_level"),
+    )
+    safety_label = hyp_control_cols[2].selectbox(
+        "Safety label",
+        ["all"] + _triage_values(triaged_hypotheses, "safety_label"),
+    )
+    hypothesis_sort = hyp_control_cols[3].selectbox(
+        "Sort hypotheses by",
+        ["Triage score", "Evidence count", "Paper coverage", "Confidence", "Experiment plan"],
+    )
+    hyp_threshold_cols = st.columns(3)
+    max_hyp_evidence = max(int(item.get("evidence_count", 0)) for item in triaged_hypotheses)
+    max_hyp_papers = max(int(item.get("paper_count", 0)) for item in triaged_hypotheses)
+    min_hyp_evidence = hyp_threshold_cols[0].selectbox("Min hypothesis evidence", list(range(max_hyp_evidence + 1)))
+    min_hyp_papers = hyp_threshold_cols[1].selectbox("Min hypothesis papers", list(range(max_hyp_papers + 1)))
+    plan_status = hyp_threshold_cols[2].selectbox("Plan status", ["all", "with plan", "missing plan"])
+    gap_type_for_hypotheses = st.selectbox(
+        "Linked gap type",
+        ["all"] + _triage_values(triaged_hypotheses, "linked_gap_type"),
+    )
+    filtered_hypotheses = _sort_hypothesis_triage(
+        _filter_hypothesis_triage(
+            triaged_hypotheses,
+            hypothesis_query,
+            confidence,
+            safety_label,
+            gap_type_for_hypotheses,
+            plan_status,
+            int(min_hyp_evidence),
+            int(min_hyp_papers),
+        ),
+        hypothesis_sort,
+    )
+    st.caption(f"Showing {len(filtered_hypotheses)} of {len(triaged_hypotheses)} hypotheses.")
+    if not filtered_hypotheses:
+        st.info("No hypotheses match the current triage filters. Try broadening the search or lowering thresholds.")
+    for hypothesis in filtered_hypotheses:
+        hypothesis_id = str(hypothesis.get("hypothesis_id", ""))
+        with st.container(border=True):
+            st.markdown(
+                f"<strong>Hypothesis:</strong> {html.escape(str(hypothesis.get('display_label', 'Hypothesis')))}",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"ID: {hypothesis_id} | Triage score: {hypothesis.get('triage_score')}")
+            _render_tag_list(
+                [
+                    ("confidence", hypothesis.get("confidence_level", "unknown"), ""),
+                    ("safety", hypothesis.get("safety_label", ""), "good"),
+                    ("evidence", hypothesis.get("evidence_count", 0), "good"),
+                    ("papers", hypothesis.get("paper_count", 0), "good"),
+                    (
+                        "plan",
+                        "available" if hypothesis.get("experiment_plan_available") else "missing",
+                        "good" if hypothesis.get("experiment_plan_available") else "warn",
+                    ),
+                ]
+            )
+            st.write(hypothesis.get("hypothesis_text"))
+            st.caption(
+                f"Linked gap: {hypothesis.get('gap_id')} | "
+                f"{hypothesis.get('linked_gap_label', '')}"
+            )
+            st.caption(f"Score inputs: {hypothesis.get('triage_score_explanation')}")
+            _render_evidence_warning(hypothesis, "hypothesis")
+            _render_evidence_action(
+                _unique_statement_ids(hypothesis.get("evidence_statement_ids", [])),
+                data,
+                f"hypothesis: {hypothesis_id}",
+                f"inspect-hypothesis-{hypothesis_id}",
+            )
+            with st.expander("Evidence and experiment plan"):
+                evidence = evidence_for_statement_ids(
+                    hypothesis.get("evidence_statement_ids", []),
+                    data["statements"],
+                )
+                if evidence:
+                    _render_dataframe(pd.DataFrame(evidence))
+                else:
+                    st.warning("No matching local evidence rows were found for this hypothesis.")
+                plan = _plan_for_hypothesis(hypothesis_id, data["experiment_plans"])
+                if plan:
+                    st.json(plan)
+                else:
+                    st.warning("No experiment plan is linked to this hypothesis yet.")
+
+
 def _subgraph_for_results(graph: nx.DiGraph, results: list[dict], max_nodes: int = 50) -> nx.DiGraph:
     if max_nodes <= 0:
         return nx.DiGraph()
@@ -1501,57 +1929,7 @@ def main() -> None:
                 st.json(related)
 
     with discoveries_tab:
-        _metric_cards(
-            [
-                ("Papers", counts["papers"]),
-                ("Statements", counts["statements"]),
-                ("Gaps", counts["gaps"]),
-                ("Hypotheses", counts["hypotheses"]),
-            ],
-            columns=4,
-        )
-        _section_header("Ranked research gaps", "Gaps are ranked by evidence count, paper coverage, and actionability.", "Discovery")
-        ranked_gaps = rank_gaps(data["gaps"], data["statements"])
-        for gap in ranked_gaps:
-            with st.container(border=True):
-                st.markdown(f"**{gap.get('gap_id')}**")
-                st.caption(
-                    f"Rank score: {gap.get('rank_score')} | Evidence: {gap.get('evidence_count')} statements | Papers: {gap.get('paper_count')}"
-                )
-                st.write(gap.get("gap_text"))
-                _render_evidence_action(
-                    _unique_statement_ids(gap.get("source_statement_ids", [])),
-                    data,
-                    f"gap: {gap.get('gap_id', '')}",
-                    f"inspect-gap-{gap.get('gap_id', '')}",
-                )
-                with st.expander("Inspect evidence"):
-                    evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
-                    _render_dataframe(pd.DataFrame(evidence))
-        _section_header("Hypotheses", "Candidate hypotheses remain speculative and linked to local evidence.", "Experiment design")
-        for hypothesis in data["hypotheses"]:
-            with st.container(border=True):
-                st.markdown(f"**{hypothesis.get('hypothesis_id')}**")
-                st.write(hypothesis.get("hypothesis_text"))
-                st.caption(
-                    f"Gap: {hypothesis.get('gap_id')} | Confidence: {hypothesis.get('confidence_level')} | Safety: {hypothesis.get('safety_label')}"
-                )
-                _render_evidence_action(
-                    _unique_statement_ids(hypothesis.get("evidence_statement_ids", [])),
-                    data,
-                    f"hypothesis: {hypothesis.get('hypothesis_id', '')}",
-                    f"inspect-hypothesis-{hypothesis.get('hypothesis_id', '')}",
-                )
-                with st.expander("Evidence and experiment plan"):
-                    evidence = evidence_for_statement_ids(hypothesis.get("evidence_statement_ids", []), data["statements"])
-                    _render_dataframe(pd.DataFrame(evidence))
-                    plans = [
-                        item
-                        for item in data["experiment_plans"]
-                        if item.get("hypothesis_id") == hypothesis.get("hypothesis_id")
-                    ]
-                    if plans:
-                        st.json(plans[0].get("plan", {}))
+        _render_discoveries_tab(data, counts)
 
     with themes_tab:
         _section_header(

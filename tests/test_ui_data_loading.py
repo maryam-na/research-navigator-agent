@@ -8,11 +8,15 @@ from ui.streamlit_app import (
     _available_statement_ids,
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
+    _filter_gap_triage,
+    _filter_hypothesis_triage,
     _global_safety_threshold_message,
     _limit_search_results,
     _load_ui_settings,
     _render_dataframe,
     _render_plotly_chart,
+    _sort_gap_triage,
+    _sort_hypothesis_triage,
     _statement_option_label,
     _subgraph_for_results,
     build_small_subgraph,
@@ -363,4 +367,86 @@ def test_render_plotly_chart_falls_back_for_legacy_streamlit_width(monkeypatch):
     assert calls == [
         ("figure", {"width": "stretch"}),
         ("figure", {"use_container_width": True}),
+    ]
+
+
+def test_discovery_gap_triage_filters_and_sorts():
+    gaps = [
+        {
+            "gap_id": "gap_a",
+            "display_label": "Sparse noisy evaluation",
+            "gap_text": "Sparse noisy evaluation remains limited.",
+            "gap_type": "limitation",
+            "source_statement_types": ["limitation"],
+            "evidence_status": "evidence-linked",
+            "evidence_count": 1,
+            "paper_count": 1,
+            "rank_score": 5,
+        },
+        {
+            "gap_id": "gap_b",
+            "display_label": "Cross-paper validation",
+            "gap_text": "Cross-paper validation remains open.",
+            "gap_type": "result_with_limitation",
+            "source_statement_types": ["result", "future_work"],
+            "evidence_status": "partial evidence",
+            "evidence_count": 3,
+            "paper_count": 2,
+            "rank_score": 13,
+        },
+    ]
+
+    filtered = _filter_gap_triage(gaps, "cross", "all", "future_work", "all", 2, 1)
+
+    assert [gap["gap_id"] for gap in filtered] == ["gap_b"]
+    assert [gap["gap_id"] for gap in _sort_gap_triage(gaps, "Paper coverage")] == ["gap_b", "gap_a"]
+
+
+def test_discovery_hypothesis_triage_filters_and_sorts():
+    hypotheses = [
+        {
+            "hypothesis_id": "hyp_a",
+            "display_label": "Local evaluation may clarify a gap",
+            "hypothesis_text": "Local evaluation may clarify a gap.",
+            "gap_id": "gap_a",
+            "linked_gap_label": "Sparse noisy evaluation",
+            "linked_gap_type": "limitation",
+            "confidence_level": "low",
+            "safety_label": "speculative_research_hypothesis",
+            "experiment_plan_available": False,
+            "evidence_count": 1,
+            "paper_count": 1,
+            "triage_score": 8,
+        },
+        {
+            "hypothesis_id": "hyp_b",
+            "display_label": "Cross-paper validation may clarify a gap",
+            "hypothesis_text": "Cross-paper validation may clarify a gap.",
+            "gap_id": "gap_b",
+            "linked_gap_label": "Cross-paper validation",
+            "linked_gap_type": "result_with_limitation",
+            "confidence_level": "medium",
+            "safety_label": "speculative_research_hypothesis",
+            "experiment_plan_available": True,
+            "evidence_count": 2,
+            "paper_count": 2,
+            "triage_score": 13,
+        },
+    ]
+
+    filtered = _filter_hypothesis_triage(
+        hypotheses,
+        "cross",
+        "medium",
+        "speculative_research_hypothesis",
+        "result_with_limitation",
+        "with plan",
+        2,
+        1,
+    )
+
+    assert [hypothesis["hypothesis_id"] for hypothesis in filtered] == ["hyp_b"]
+    assert [hypothesis["hypothesis_id"] for hypothesis in _sort_hypothesis_triage(hypotheses, "Confidence")] == [
+        "hyp_b",
+        "hyp_a",
     ]
