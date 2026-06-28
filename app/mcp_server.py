@@ -21,30 +21,44 @@ MCP_TOOL_SPECS = [
     {
         "name": "describe_agent_capabilities",
         "description": "Describe the local ADK-facing ResearchNavigator agent and its tools.",
+        "stage": "agent_story",
+        "safety_gate": "local_capability_disclosure",
     },
     {
         "name": "planned_tool_trajectory",
         "description": "Return the deterministic tool trajectory for a research-discovery goal.",
+        "stage": "orchestration",
+        "safety_gate": "policy_gates_visible",
     },
     {
         "name": "summarize_local_project",
         "description": "Summarize local processed papers, statements, graph, discoveries, and evaluation.",
+        "stage": "status",
+        "safety_gate": "artifact_presence_checked",
     },
     {
         "name": "search_local_corpus",
         "description": "Search local processed papers, statements, gaps, hypotheses, and plans.",
+        "stage": "retrieval",
+        "safety_gate": "local_processed_artifacts_only",
     },
     {
         "name": "inspect_evidence",
         "description": "Return compact evidence rows for local statement IDs.",
+        "stage": "grounding",
+        "safety_gate": "evidence_id_traceability",
     },
     {
         "name": "generate_local_research_brief",
         "description": "Generate a local Markdown research brief from processed artifacts.",
+        "stage": "reporting",
+        "safety_gate": "local_write_path",
     },
     {
         "name": "check_local_policy",
         "description": "Check proposed tool actions against local-first policy rules.",
+        "stage": "policy",
+        "safety_gate": "policy_enforcement",
     },
 ]
 

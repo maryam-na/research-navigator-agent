@@ -81,6 +81,18 @@ That tab shows:
 
 - ADK agent view
 - callable tool manifest
+- capstone concept proof points
 - planned deterministic tool trajectory
 - per-stage safety gates
+- policy and human-review gates
 - final answer contract
+
+## Implementation Proof Points
+
+- The ADK manifest includes tool stages, course-concept labels, policy boundaries,
+  inputs, outputs, and safety gates.
+- The planned trajectory explains why each step exists before the agent presents an
+  answer.
+- The MCP manifest exposes stage and safety-gate metadata for the selected local tools.
+- The final answer contract requires local artifact paths or statement IDs, separation
+  of evidence from speculation, visible evaluation warnings, and human-review notes.

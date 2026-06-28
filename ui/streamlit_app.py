@@ -2364,10 +2364,19 @@ def main() -> None:
                     }
                 )
             )
+            _render_dataframe(pd.DataFrame(agent_story["capstone_concept_proofs"]))
+            _render_dataframe(pd.DataFrame(agent_story["orchestration_rationale"]))
             _render_dataframe(
                 pd.DataFrame(
                     {
                         "safety_boundary": agent_story["safety_boundaries"],
+                    }
+                )
+            )
+            _render_dataframe(
+                pd.DataFrame(
+                    {
+                        "human_review_gate": agent_story["human_review_gates"],
                     }
                 )
             )
@@ -2379,6 +2388,8 @@ def main() -> None:
             "Trajectory",
         )
         _render_dataframe(pd.DataFrame(trajectory["steps"]))
+        st.caption(trajectory["why_this_is_agentic"])
+        _render_dataframe(pd.DataFrame({"policy_gate": trajectory["policy_gates"]}))
         st.caption("Final answer contract: " + " | ".join(trajectory["final_answer_contract"]))
 
         mcp_manifest = mcp_tool_manifest()

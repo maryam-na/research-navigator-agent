@@ -29,7 +29,8 @@ DEFAULT_GRAPH_PATH = "data/processed/research_graph.graphml"
 DEFAULT_DISCOVERY_PATH = "data/processed/gaps_and_hypotheses.json"
 DEFAULT_EVALUATION_PATH = "data/processed/evaluation_report.json"
 
-
+# This manifest is intentionally inspectable: it is used by ADK, Streamlit, tests,
+# and MCP docs to show how bounded local tools form an agentic workflow.
 ADK_TOOL_MANIFEST = [
     {
         "tool_name": "run_local_demo_pipeline",
@@ -38,6 +39,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["reset"],
         "outputs": ["papers", "chunks", "statements", "graph", "gaps", "hypotheses", "evaluation"],
         "safety_gate": "local_files_only",
+        "course_concept": "Agent / ADK tool orchestration",
+        "policy_boundary": "Runs only repository-local pipeline commands and artifacts.",
     },
     {
         "tool_name": "ingest_local_papers",
@@ -46,6 +49,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["papers_dir", "db_path", "max_statements_per_type_per_paper"],
         "outputs": ["papers", "chunks", "raw_statements", "saved_statements"],
         "safety_gate": "prompt_injection_treated_as_data",
+        "course_concept": "Security features",
+        "policy_boundary": "Paper text is treated as data, not executable instructions.",
     },
     {
         "tool_name": "build_local_graph",
@@ -54,6 +59,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["db_path", "graph_path"],
         "outputs": ["graphml", "node_count", "edge_count", "relation_types"],
         "safety_gate": "graph_size_checked",
+        "course_concept": "Tool use",
+        "policy_boundary": "Builds graph structure only from stored local records.",
     },
     {
         "tool_name": "discover_local_research_gaps",
@@ -62,6 +69,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["db_path", "output_path", "max_gaps", "max_hypotheses"],
         "outputs": ["gaps", "hypotheses", "experiment_plans"],
         "safety_gate": "evidence_required",
+        "course_concept": "Agent / ADK tool orchestration",
+        "policy_boundary": "Generated ideas must link back to local statement IDs.",
     },
     {
         "tool_name": "evaluate_local_outputs",
@@ -70,6 +79,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["db_path", "input_path", "output_path"],
         "outputs": ["overall_score", "grounding_score", "safety_score", "failed_checks"],
         "safety_gate": "overclaiming_and_unsupported_claim_checks",
+        "course_concept": "Security features",
+        "policy_boundary": "Surfaces warnings instead of hiding weak grounding or generic plans.",
     },
     {
         "tool_name": "search_local_corpus",
@@ -78,6 +89,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["query", "result_type", "statement_type"],
         "outputs": ["ranked_local_results"],
         "safety_gate": "local_processed_artifacts_only",
+        "course_concept": "Grounded retrieval",
+        "policy_boundary": "Searches processed local artifacts rather than external web sources.",
     },
     {
         "tool_name": "inspect_evidence",
@@ -86,6 +99,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["statement_ids"],
         "outputs": ["statement_text", "evidence_text", "paper_id", "statement_type"],
         "safety_gate": "evidence_id_traceability",
+        "course_concept": "Security features",
+        "policy_boundary": "Answers can be traced to local statement IDs and snippets.",
     },
     {
         "tool_name": "summarize_local_project",
@@ -94,6 +109,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": [],
         "outputs": ["counts", "top_gap_ids", "evaluation"],
         "safety_gate": "artifact_presence_checked",
+        "course_concept": "Agent / ADK tool orchestration",
+        "policy_boundary": "Reports local readiness without claiming scientific validity.",
     },
     {
         "tool_name": "generate_local_research_brief",
@@ -102,6 +119,8 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["output_path"],
         "outputs": ["markdown_brief_path", "characters"],
         "safety_gate": "local_write_path",
+        "course_concept": "Agent skills",
+        "policy_boundary": "Writes only to a requested local path for human review.",
     },
     {
         "tool_name": "check_local_policy",
@@ -110,6 +129,91 @@ ADK_TOOL_MANIFEST = [
         "inputs": ["tool_name", "action_args"],
         "outputs": ["passed", "failed_checks", "sanitized_args"],
         "safety_gate": "policy_enforcement",
+        "course_concept": "Security features",
+        "policy_boundary": (
+            "Blocks external, deployment, training, email, and unsafe write actions."
+        ),
+    },
+    {
+        "tool_name": "describe_agent_capabilities",
+        "stage": "agent_story",
+        "purpose": (
+            "Explain the ADK wrapper, local tools, capstone concept proofs, "
+            "and safety boundaries."
+        ),
+        "inputs": [],
+        "outputs": [
+            "agent_name",
+            "tools",
+            "capstone_concept_proofs",
+            "orchestration_rationale",
+            "safety_boundaries",
+        ],
+        "safety_gate": "local_capability_disclosure",
+        "course_concept": "Agent / ADK tool orchestration",
+        "policy_boundary": "Describes local capabilities without invoking external services.",
+    },
+    {
+        "tool_name": "planned_tool_trajectory",
+        "stage": "orchestration_explanation",
+        "purpose": (
+            "Show the deterministic tool path, policy gates, and final-answer "
+            "contract for a goal."
+        ),
+        "inputs": ["user_goal"],
+        "outputs": ["steps", "policy_gates", "final_answer_contract"],
+        "safety_gate": "policy_gates_visible",
+        "course_concept": "Agent / ADK tool orchestration",
+        "policy_boundary": "Exposes expected policy gates before any side-effecting action.",
+    },
+]
+
+
+CAPSTONE_CONCEPT_PROOFS = [
+    {
+        "concept": "Agent / ADK",
+        "proof": "`app/agent.py` registers a root ADK agent over deterministic local tools.",
+        "visible_in": "Pipeline Trace: ADK agent view and tool manifest",
+    },
+    {
+        "concept": "MCP Server",
+        "proof": "`app/mcp_server.py` exposes selected local tools through a FastMCP wrapper.",
+        "visible_in": "Pipeline Trace: Local MCP server and `make mcp`",
+    },
+    {
+        "concept": "Security features",
+        "proof": "Policy, grounding, prompt-injection, and overclaiming checks are callable tools.",
+        "visible_in": "Safety & Evaluation and Pipeline Trace safety gates",
+    },
+    {
+        "concept": "Agent skills",
+        "proof": "`SKILL.md` and `.agent/skills/research-navigator/SKILL.md` encode local rules.",
+        "visible_in": "Pipeline Trace and judge-facing docs",
+    },
+    {
+        "concept": "Deployability",
+        "proof": "Makefile targets reproduce the local pipeline, validation, UI, and MCP server.",
+        "visible_in": "`make demo`, `make validate`, `make ui`, and `make mcp`",
+    },
+]
+
+
+ORCHESTRATION_RATIONALE = [
+    {
+        "principle": "Tool trajectory before answer",
+        "effect": "The agent exposes the expected order from ingestion through evaluation.",
+    },
+    {
+        "principle": "Evidence before speculation",
+        "effect": "Gaps and hypotheses are generated only from local statement IDs.",
+    },
+    {
+        "principle": "Policy before side effects",
+        "effect": "Blocked actions are checked before any external or unsafe operation.",
+    },
+    {
+        "principle": "Same tools through ADK and MCP",
+        "effect": "MCP clients receive bounded local capabilities without new trust rules.",
     },
 ]
 
@@ -127,11 +231,19 @@ AGENT_TECHNOLOGY_STORY = {
         "safety checks before generated claims",
         "evaluation and traceability",
     ],
+    "capstone_concept_proofs": CAPSTONE_CONCEPT_PROOFS,
+    "orchestration_rationale": ORCHESTRATION_RATIONALE,
     "safety_boundaries": [
         "Paper text is treated as untrusted data, not instructions.",
         "Outputs must reference local statement IDs.",
         "Hypotheses are labeled speculative and cannot be phrased as proven discoveries.",
         "External browsing, deployment, email, and model training are blocked for the MVP.",
+    ],
+    "human_review_gates": [
+        "adding or replacing papers",
+        "exporting reports",
+        "using generated hypotheses outside the prototype",
+        "expanding beyond the 5-10 paper MVP corpus",
     ],
 }
 
@@ -162,6 +274,7 @@ def planned_tool_trajectory(user_goal: str = "discover grounded research gaps") 
             "stage": tool["stage"],
             "why": _trajectory_reason(str(tool["stage"]), user_goal),
             "safety_gate": tool["safety_gate"],
+            "policy_boundary": tool["policy_boundary"],
         }
         for index, tool in enumerate(ADK_TOOL_MANIFEST[:5])
     ]
@@ -173,6 +286,7 @@ def planned_tool_trajectory(user_goal: str = "discover grounded research gaps") 
                 "stage": "retrieval",
                 "why": "Answer user questions from processed local evidence after the pipeline is complete.",
                 "safety_gate": "local_processed_artifacts_only",
+                "policy_boundary": "Searches only the local processed corpus.",
             },
             {
                 "order": 7,
@@ -180,6 +294,7 @@ def planned_tool_trajectory(user_goal: str = "discover grounded research gaps") 
                 "stage": "grounding",
                 "why": "Show statement-level evidence for any gap, hypothesis, or answer.",
                 "safety_gate": "evidence_id_traceability",
+                "policy_boundary": "Keeps answers traceable to local statement IDs.",
             },
             {
                 "order": 8,
@@ -187,17 +302,32 @@ def planned_tool_trajectory(user_goal: str = "discover grounded research gaps") 
                 "stage": "policy",
                 "why": "Block actions outside the local-first MVP boundary before execution.",
                 "safety_gate": "policy_enforcement",
+                "policy_boundary": (
+                    "Rejects cloud, email, external browsing, training, and unsafe writes."
+                ),
             },
         ]
     )
     return {
         "user_goal": user_goal,
         "trajectory_type": "deterministic_adk_tool_plan",
+        "why_this_is_agentic": (
+            "The ADK wrapper exposes a tool trajectory, policy gates, evidence inspection, "
+            "and final-answer contract instead of returning an opaque summary."
+        ),
         "steps": steps,
+        "policy_gates": [
+            "paper_text_is_untrusted_data",
+            "local_artifacts_only",
+            "evidence_ids_required",
+            "speculative_hypotheses_labeled",
+            "external_actions_policy_checked",
+        ],
         "final_answer_contract": [
             "cite local artifact paths or statement IDs",
             "separate evidence-backed findings from speculative hypotheses",
             "include evaluation warnings when relevant",
+            "state when human review is required",
         ],
     }
 

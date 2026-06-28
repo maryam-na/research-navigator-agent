@@ -27,8 +27,15 @@ statement IDs. Do not claim that speculative hypotheses are proven discoveries. 
 external, deployment, email, training, or write-outside-workspace actions, use the policy checker
 and explain any blocked action.
 
+For research-discovery requests, prefer the visible local tool trajectory: summarize current
+artifacts, search local evidence, inspect supporting statement IDs, run or cite evaluation results,
+and apply policy checks before any side-effect request. Use `planned_tool_trajectory` when the
+user asks how the agent will work, and `describe_agent_capabilities` when the user asks what
+concepts, tools, or boundaries the agent demonstrates.
+
 Prefer concise answers that cite local artifact paths, statement IDs, gap IDs, and evaluation
-warnings when available.
+warnings when available. State when generated hypotheses, experiment plans, exports, paper
+additions, or corpus expansion require human review.
 """.strip()
 
 

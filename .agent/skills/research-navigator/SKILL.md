@@ -14,6 +14,7 @@ Use this skill when the task involves:
 - drafting experiment plans
 - checking grounding, safety, or evaluation behavior
 - improving the Streamlit research dashboard
+- strengthening ADK/MCP agent concept visibility
 
 ## Required Context
 
@@ -45,6 +46,16 @@ Read these files before implementation work:
 4. Run safety and policy checks where relevant.
 5. Run pytest.
 6. Update docs if behavior changes.
+
+## Agent Concept Proof Points
+
+- `app/agent.py`: ADK-facing root agent instruction and tool registration.
+- `app/adk_tools.py`: deterministic tools, capability manifest, tool trajectory,
+  policy boundaries, and final-answer contract.
+- `app/mcp_server.py`: local MCP wrapper exposing selected tools with safety metadata.
+- `ui/streamlit_app.py`: Pipeline Trace tab showing ADK, MCP, tool trajectory, safety
+  gates, human-review gates, and local commands.
+- `SKILL.md`: reusable local-first behavior contract for future agent work.
 
 ## Commands
 

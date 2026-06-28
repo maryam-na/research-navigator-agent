@@ -25,6 +25,8 @@ def test_mcp_tool_manifest_exposes_expected_tools():
     assert "inspect_evidence" in names
     assert "check_local_policy" in names
     assert "describe_agent_capabilities" in names
+    assert all(tool["stage"] for tool in manifest)
+    assert all(tool["safety_gate"] for tool in manifest)
 
 
 def test_register_mcp_tools_registers_fake_server_tools():

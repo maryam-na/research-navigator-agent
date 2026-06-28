@@ -30,6 +30,9 @@ The MCP server exposes:
 - `generate_local_research_brief`
 - `check_local_policy`
 
+The manifest also includes each tool's stage and safety gate so MCP clients can see
+that the exposed capabilities follow the same local-first boundaries as the ADK layer.
+
 ## Why It Exists
 
 The ADK wrapper demonstrates agent orchestration inside the project. The MCP wrapper demonstrates how the same local deterministic capabilities can be exposed to an MCP-compatible client without changing the safety model.
