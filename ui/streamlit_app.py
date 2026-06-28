@@ -27,6 +27,7 @@ from ui.corpus_setup import (
     validate_pdf_upload_selection,
 )
 from ui.data_access import (
+    build_artifact_readiness,
     build_evidence_chain,
     build_ingestion_status,
     build_research_themes,
@@ -54,6 +55,7 @@ DEFAULT_DB_PATH = Path("data/processed/papers.sqlite")
 DEFAULT_GRAPH_PATH = Path("data/processed/research_graph.graphml")
 DEFAULT_DISCOVERY_PATH = Path("data/processed/gaps_and_hypotheses.json")
 DEFAULT_EVALUATION_PATH = Path("data/processed/evaluation_report.json")
+DEFAULT_BRIEF_PATH = Path("data/processed/researchnavigator_brief.md")
 FALLBACK_DEFAULT_SEARCH_QUERY = "limitations evaluation dataset"
 FALLBACK_MAX_SEARCH_RESULTS = 30
 STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "dataset", "background"]
@@ -66,6 +68,46 @@ PIPELINE_COMMANDS = [
     "uv run python -m scripts.discover_gaps --db-path data/processed/papers.sqlite --output-path data/processed/gaps_and_hypotheses.json",
     "uv run python -m scripts.evaluate_outputs --db-path data/processed/papers.sqlite --input-path data/processed/gaps_and_hypotheses.json --output-path data/processed/evaluation_report.json",
     "uv run streamlit run ui/streamlit_app.py",
+]
+BRIEF_ARTIFACT_COMMAND = (
+    "uv run python -m scripts.run_demo --brief-path "
+    "data/processed/researchnavigator_brief.md"
+)
+ARTIFACT_SPECS = [
+    {
+        "key": "database",
+        "label": "SQLite database",
+        "path": DEFAULT_DB_PATH,
+        "recovery_step": PIPELINE_COMMANDS[0],
+    },
+    {
+        "key": "graph",
+        "label": "Knowledge graph",
+        "path": DEFAULT_GRAPH_PATH,
+        "depends_on": [DEFAULT_DB_PATH],
+        "recovery_step": PIPELINE_COMMANDS[1],
+    },
+    {
+        "key": "discoveries",
+        "label": "Gaps and hypotheses",
+        "path": DEFAULT_DISCOVERY_PATH,
+        "depends_on": [DEFAULT_DB_PATH],
+        "recovery_step": PIPELINE_COMMANDS[2],
+    },
+    {
+        "key": "evaluation",
+        "label": "Evaluation report",
+        "path": DEFAULT_EVALUATION_PATH,
+        "depends_on": [DEFAULT_DB_PATH, DEFAULT_DISCOVERY_PATH],
+        "recovery_step": PIPELINE_COMMANDS[3],
+    },
+    {
+        "key": "brief",
+        "label": "Saved research brief",
+        "path": DEFAULT_BRIEF_PATH,
+        "depends_on": [DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH],
+        "recovery_step": BRIEF_ARTIFACT_COMMAND,
+    },
 ]
 
 
@@ -291,6 +333,11 @@ def _inject_global_styles() -> None:
             border-color: #fecaca;
             border-left-color: var(--rn-red);
             background: #fff7f7;
+        }
+        .rn-review-banner.good {
+            border-color: #99f6e4;
+            border-left-color: var(--rn-green);
+            background: #f0fdfa;
         }
         .rn-review-title {
             font-weight: 760;
@@ -519,6 +566,117 @@ def _render_status_strip(counts: dict, evaluation: dict) -> None:
             "</span>"
         )
     st.markdown(f'<div class="rn-status-strip">{"".join(chips)}</div>', unsafe_allow_html=True)
+
+
+def _render_artifact_readiness(readiness: dict[str, object]) -> None:
+    artifacts = list(readiness.get("artifacts", []) or [])
+    problem_artifacts = list(readiness.get("problem_artifacts", []) or [])
+    counts = dict(readiness.get("counts", {}) or {})
+    status = str(readiness.get("status", "partial"))
+    banner_class = _artifact_banner_class(status)
+    items = problem_artifacts[:4] if problem_artifacts else artifacts[:1]
+    item_markup = "".join(
+        "<li>"
+        f"<strong>{html.escape(str(item.get('label', 'Artifact')))}</strong>: "
+        f"{html.escape(str(item.get('status', 'unknown')).title())}. "
+        f"{html.escape(str(item.get('reason', '')))}"
+        "</li>"
+        for item in items
+    )
+    if problem_artifacts and len(problem_artifacts) > len(items):
+        remaining_count = len(problem_artifacts) - len(items)
+        item_markup += f"<li>{remaining_count} more artifact(s) need attention.</li>"
+    headline = html.escape(str(readiness.get("headline", "Artifact readiness")))
+    summary = html.escape(str(readiness.get("summary", "")))
+    st.markdown(
+        f"""
+        <div class="rn-review-banner {banner_class}">
+          <div class="rn-review-title">{headline}</div>
+          <div class="rn-review-text">{summary}</div>
+          <ul>{item_markup}</ul>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if problem_artifacts:
+        _metric_cards(
+            [
+                ("Ready", counts.get("ready", 0)),
+                ("Missing", counts.get("missing", 0)),
+                ("Stale", counts.get("stale", 0)),
+                ("Expected", counts.get("total", 0)),
+            ],
+            columns=4,
+        )
+        _render_recovery_steps(problem_artifacts)
+        with st.expander("Artifact details", expanded=True):
+            _render_artifact_status_table(readiness)
+    else:
+        with st.expander("Artifact details", expanded=False):
+            _render_artifact_status_table(readiness)
+
+
+def _render_artifact_guidance(readiness: dict[str, object], artifact_key: str) -> None:
+    artifact = _artifact_by_key(readiness, artifact_key)
+    if not artifact or artifact.get("status") == "ready":
+        return
+    banner_class = "fail" if artifact.get("status") == "missing" else "warn"
+    artifact_label = html.escape(str(artifact.get("label", "Artifact")))
+    artifact_status = html.escape(str(artifact.get("status", "not ready")))
+    artifact_reason = html.escape(str(artifact.get("reason", "")))
+    st.markdown(
+        f"""
+        <div class="rn-review-banner {banner_class}">
+          <div class="rn-review-title">{artifact_label} is {artifact_status}</div>
+          <div class="rn-review-text">{artifact_reason}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _render_recovery_steps([artifact])
+
+
+def _render_recovery_steps(artifacts: list[dict]) -> None:
+    steps = []
+    for artifact in artifacts:
+        step = str(artifact.get("recovery_step", "")).strip()
+        if step and step not in steps:
+            steps.append(step)
+    if not steps:
+        return
+    st.markdown("#### Recovery commands")
+    st.code("\n".join(steps), language="bash")
+
+
+def _render_artifact_status_table(readiness: dict[str, object]) -> None:
+    artifacts = list(readiness.get("artifacts", []) or [])
+    rows = [
+        {
+            "artifact": item.get("label", ""),
+            "status": item.get("status", ""),
+            "path": item.get("path", ""),
+            "size_bytes": item.get("size_bytes", 0),
+            "modified": item.get("modified", ""),
+            "reason": item.get("reason", ""),
+        }
+        for item in artifacts
+    ]
+    _render_dataframe(pd.DataFrame(rows))
+
+
+def _artifact_by_key(readiness: dict[str, object], artifact_key: str) -> dict | None:
+    for artifact in list(readiness.get("artifacts", []) or []):
+        if artifact.get("key") == artifact_key:
+            return artifact
+    return None
+
+
+def _artifact_banner_class(status: str) -> str:
+    if status == "ready":
+        return "good"
+    if status == "missing":
+        return "fail"
+    return "warn"
 
 
 def evaluation_status_summary(evaluation: dict | None) -> dict[str, object]:
@@ -1967,9 +2125,11 @@ def main() -> None:
     graph = data["graph"]
     evaluation = data["evaluation"]
     counts = dashboard_counts(processed_data, graph, discovery, evaluation)
+    artifact_readiness = build_artifact_readiness(ARTIFACT_SPECS)
 
     _render_header(counts, evaluation)
     _render_status_strip(counts, evaluation)
+    _render_artifact_readiness(artifact_readiness)
 
     if not DEFAULT_DB_PATH.exists():
         _show_pipeline_instructions()
@@ -2096,6 +2256,7 @@ def main() -> None:
                 st.json(related)
 
     with discoveries_tab:
+        _render_artifact_guidance(artifact_readiness, "discoveries")
         _render_discoveries_tab(data, counts)
 
     with themes_tab:
@@ -2124,11 +2285,13 @@ def main() -> None:
             "Search-linked graph sample when results are available; otherwise an overview subgraph.",
             "Graph",
         )
+        _render_artifact_guidance(artifact_readiness, "graph")
         st.json(graph_summary(subgraph))
         _render_graph(subgraph)
 
     with report_tab:
         _section_header("Exportable research brief", "A local Markdown brief generated from current artifacts.", "Report")
+        _render_artifact_guidance(artifact_readiness, "brief")
         brief = create_research_brief(data)
         st.download_button(
             "Download Markdown brief",
@@ -2139,6 +2302,7 @@ def main() -> None:
         st.code(brief, language="markdown")
 
     with safety_tab:
+        _render_artifact_guidance(artifact_readiness, "evaluation")
         if not evaluation:
             status = evaluation_status_summary(evaluation)
             _section_header(
@@ -2257,11 +2421,21 @@ def main() -> None:
             )
         )
         st.markdown("### Generated files")
-        _render_dataframe(
-            file_presence([DEFAULT_DB_PATH, DEFAULT_GRAPH_PATH, DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH])
-        )
+        _render_artifact_status_table(artifact_readiness)
+        with st.expander("Raw file presence"):
+            _render_dataframe(
+                file_presence(
+                    [
+                        DEFAULT_DB_PATH,
+                        DEFAULT_GRAPH_PATH,
+                        DEFAULT_DISCOVERY_PATH,
+                        DEFAULT_EVALUATION_PATH,
+                        DEFAULT_BRIEF_PATH,
+                    ]
+                )
+            )
         st.markdown("### Commands")
-        st.code("\n".join(PIPELINE_COMMANDS), language="bash")
+        st.code("\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND]), language="bash")
         with st.expander("Raw backend tables"):
             _render_dataframe(data["papers"])
             _render_dataframe(data["statements"])

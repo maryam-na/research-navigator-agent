@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -433,6 +434,111 @@ def file_presence(paths: list[str | Path]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def build_artifact_readiness(artifact_specs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Assess generated artifact presence and freshness against local inputs."""
+
+    artifact_rows = []
+    path_labels = {
+        str(Path(spec.get("path", ""))): str(spec.get("label", spec.get("key", "Artifact")))
+        for spec in artifact_specs
+    }
+    for spec in artifact_specs:
+        path = Path(spec["path"])
+        stat = _safe_stat(path)
+        dependency_paths = [Path(item) for item in spec.get("depends_on", [])]
+        stale_dependencies = []
+        missing_dependencies = []
+        for dependency in dependency_paths:
+            dependency_stat = _safe_stat(dependency)
+            dependency_label = path_labels.get(str(dependency), str(dependency))
+            if dependency_stat is None:
+                missing_dependencies.append({"label": dependency_label, "path": str(dependency)})
+            elif stat is not None and dependency_stat.st_mtime > stat.st_mtime:
+                stale_dependencies.append({"label": dependency_label, "path": str(dependency)})
+
+        if stat is None:
+            status = "missing"
+            reason = "Artifact file is missing."
+        elif missing_dependencies:
+            status = "stale"
+            dependency_names = ", ".join(item["label"] for item in missing_dependencies)
+            reason = (
+                "Freshness cannot be verified because input artifact is missing: "
+                f"{dependency_names}."
+            )
+        elif stale_dependencies:
+            status = "stale"
+            dependency_names = ", ".join(item["label"] for item in stale_dependencies)
+            reason = f"Artifact is older than input artifact: {dependency_names}."
+        else:
+            status = "ready"
+            reason = "Artifact is present and current enough for known inputs."
+
+        artifact_rows.append(
+            {
+                "key": str(spec.get("key", path.stem)),
+                "label": str(spec.get("label", path.name)),
+                "path": str(path),
+                "present": stat is not None,
+                "required": bool(spec.get("required", True)),
+                "status": status,
+                "reason": reason,
+                "recovery_step": str(spec.get("recovery_step", "")),
+                "depends_on": [str(item) for item in dependency_paths],
+                "size_bytes": stat.st_size if stat is not None else 0,
+                "modified": _format_stat_time(stat.st_mtime) if stat is not None else "",
+            }
+        )
+
+    counts = {
+        "ready": sum(1 for item in artifact_rows if item["status"] == "ready"),
+        "missing": sum(1 for item in artifact_rows if item["status"] == "missing"),
+        "stale": sum(1 for item in artifact_rows if item["status"] == "stale"),
+        "total": len(artifact_rows),
+    }
+    database_missing = any(
+        item["key"] == "database" and item["status"] == "missing" for item in artifact_rows
+    )
+    problem_artifacts = [item for item in artifact_rows if item["status"] != "ready"]
+    if database_missing:
+        status = "missing"
+        headline = "Processed artifacts are not ready"
+        summary = (
+            "Start with PDF ingestion to create the local SQLite database, "
+            "then rerun downstream steps."
+        )
+    elif problem_artifacts:
+        status = "partial"
+        headline = "Processed artifacts need attention"
+        summary = (
+            "Some generated files are missing or older than their inputs; "
+            "rerun the listed local commands."
+        )
+    else:
+        status = "ready"
+        headline = "Processed artifacts are ready"
+        summary = "All expected local generated artifacts are present and current enough."
+    return {
+        "status": status,
+        "headline": headline,
+        "summary": summary,
+        "counts": counts,
+        "artifacts": artifact_rows,
+        "problem_artifacts": problem_artifacts,
+    }
+
+
+def _safe_stat(path: Path) -> Any | None:
+    try:
+        return path.stat()
+    except OSError:
+        return None
+
+
+def _format_stat_time(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp).isoformat(timespec="seconds")
 
 
 def load_processed_data(

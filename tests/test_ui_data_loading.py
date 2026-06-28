@@ -1,4 +1,5 @@
 import json
+import os
 
 import networkx as nx
 
@@ -19,6 +20,7 @@ from ui.streamlit_app import (
     _sort_hypothesis_triage,
     _statement_option_label,
     _subgraph_for_results,
+    build_artifact_readiness,
     build_small_subgraph,
     dashboard_counts,
     evaluation_status_summary,
@@ -45,6 +47,11 @@ def create_sample_db(db_path):
         "We propose a deterministic local graph construction approach.",
         "rule:we propose",
     )
+
+
+def write_artifact(path, modified_time):
+    path.write_text("artifact", encoding="utf-8")
+    os.utime(path, (modified_time, modified_time))
 
 
 def test_load_processed_data_returns_expected_tables(tmp_path):
@@ -155,6 +162,126 @@ def test_dashboard_counts_and_file_presence(tmp_path):
     assert counts["safety_score"] == 1.0
     assert presence.to_dict("records")[0]["present"] is True
     assert presence.to_dict("records")[1]["present"] is False
+
+
+def test_artifact_readiness_reports_all_ready_when_outputs_are_current(tmp_path):
+    db_path = tmp_path / "papers.sqlite"
+    graph_path = tmp_path / "graph.graphml"
+    discovery_path = tmp_path / "gaps.json"
+    evaluation_path = tmp_path / "evaluation.json"
+    brief_path = tmp_path / "brief.md"
+    write_artifact(db_path, 100)
+    write_artifact(graph_path, 110)
+    write_artifact(discovery_path, 120)
+    write_artifact(evaluation_path, 130)
+    write_artifact(brief_path, 140)
+
+    readiness = build_artifact_readiness(
+        [
+            {
+                "key": "database",
+                "label": "Database",
+                "path": db_path,
+                "recovery_step": "ingest",
+            },
+            {
+                "key": "graph",
+                "label": "Graph",
+                "path": graph_path,
+                "depends_on": [db_path],
+                "recovery_step": "build graph",
+            },
+            {
+                "key": "discoveries",
+                "label": "Discoveries",
+                "path": discovery_path,
+                "depends_on": [db_path],
+                "recovery_step": "discover",
+            },
+            {
+                "key": "evaluation",
+                "label": "Evaluation",
+                "path": evaluation_path,
+                "depends_on": [db_path, discovery_path],
+                "recovery_step": "evaluate",
+            },
+            {
+                "key": "brief",
+                "label": "Brief",
+                "path": brief_path,
+                "depends_on": [discovery_path, evaluation_path],
+                "recovery_step": "brief",
+            },
+        ]
+    )
+
+    assert readiness["status"] == "ready"
+    assert readiness["counts"] == {"ready": 5, "missing": 0, "stale": 0, "total": 5}
+    assert readiness["problem_artifacts"] == []
+
+
+def test_artifact_readiness_flags_missing_and_stale_outputs(tmp_path):
+    db_path = tmp_path / "papers.sqlite"
+    graph_path = tmp_path / "graph.graphml"
+    discovery_path = tmp_path / "gaps.json"
+    evaluation_path = tmp_path / "evaluation.json"
+    brief_path = tmp_path / "brief.md"
+    write_artifact(db_path, 200)
+    write_artifact(graph_path, 100)
+    write_artifact(evaluation_path, 250)
+    write_artifact(brief_path, 260)
+
+    readiness = build_artifact_readiness(
+        [
+            {
+                "key": "database",
+                "label": "Database",
+                "path": db_path,
+                "recovery_step": "ingest",
+            },
+            {
+                "key": "graph",
+                "label": "Graph",
+                "path": graph_path,
+                "depends_on": [db_path],
+                "recovery_step": "build graph",
+            },
+            {
+                "key": "discoveries",
+                "label": "Discoveries",
+                "path": discovery_path,
+                "depends_on": [db_path],
+                "recovery_step": "discover",
+            },
+            {
+                "key": "evaluation",
+                "label": "Evaluation",
+                "path": evaluation_path,
+                "depends_on": [db_path, discovery_path],
+                "recovery_step": "evaluate",
+            },
+            {
+                "key": "brief",
+                "label": "Brief",
+                "path": brief_path,
+                "depends_on": [discovery_path, evaluation_path],
+                "recovery_step": "brief",
+            },
+        ]
+    )
+    statuses = {artifact["key"]: artifact["status"] for artifact in readiness["artifacts"]}
+    reasons = {artifact["key"]: artifact["reason"] for artifact in readiness["artifacts"]}
+
+    assert readiness["status"] == "partial"
+    assert statuses["database"] == "ready"
+    assert statuses["graph"] == "stale"
+    assert statuses["discoveries"] == "missing"
+    assert statuses["evaluation"] == "stale"
+    assert statuses["brief"] == "stale"
+    assert readiness["counts"]["missing"] == 1
+    assert readiness["counts"]["stale"] == 3
+    assert "older than input artifact" in reasons["graph"]
+    assert "input artifact is missing" in reasons["evaluation"]
 
 
 def test_evaluation_status_distinguishes_caveats_from_pass():
