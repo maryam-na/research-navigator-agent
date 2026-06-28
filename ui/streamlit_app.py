@@ -15,6 +15,7 @@ import streamlit as st
 
 from app.adk_tools import describe_agent_capabilities, planned_tool_trajectory
 from app.mcp_server import MCP_SERVER_NAME, mcp_tool_manifest
+from tools.config_tools import DEFAULT_CONFIG_PATH, load_config
 from tools.graph_tools import graph_summary
 from ui.corpus_setup import (
     CORPUS_MAX_PDFS,
@@ -51,6 +52,8 @@ DEFAULT_DB_PATH = Path("data/processed/papers.sqlite")
 DEFAULT_GRAPH_PATH = Path("data/processed/research_graph.graphml")
 DEFAULT_DISCOVERY_PATH = Path("data/processed/gaps_and_hypotheses.json")
 DEFAULT_EVALUATION_PATH = Path("data/processed/evaluation_report.json")
+FALLBACK_DEFAULT_SEARCH_QUERY = "limitations evaluation dataset"
+FALLBACK_MAX_SEARCH_RESULTS = 30
 STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "dataset", "background"]
 RESULT_TYPES = ["all", "statements", "gaps", "hypotheses", "experiment_plans"]
 SELECTED_EVIDENCE_KEY = "selected_evidence_statement_id"
@@ -578,6 +581,53 @@ def _metric_cards(items: list[tuple[str, object]], columns: int = 4) -> None:
     st.markdown(f'<div class="rn-metric-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
+def _load_ui_settings(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, int | str]:
+    """Load intentional UI defaults from config, falling back to safe local values."""
+
+    try:
+        ui_config = load_config(config_path).ui
+    except (FileNotFoundError, ValueError):
+        return {
+            "default_search_query": FALLBACK_DEFAULT_SEARCH_QUERY,
+            "max_search_results": FALLBACK_MAX_SEARCH_RESULTS,
+        }
+    return {
+        "default_search_query": ui_config.default_search_query,
+        "max_search_results": ui_config.max_search_results,
+    }
+
+
+def _limit_search_results(results: list[dict], max_results: int) -> tuple[list[dict], str | None]:
+    limited_results = results[:max_results]
+    if len(results) <= max_results:
+        return limited_results, None
+    return limited_results, f"Showing top {len(limited_results)} of {len(results)} local matches."
+
+
+def _global_safety_threshold_message(
+    evaluation: dict,
+    threshold: float,
+) -> tuple[str, str] | None:
+    if threshold <= 0:
+        return None
+    raw_score = evaluation.get("safety_score")
+    if raw_score is None:
+        return "info", "Evaluation safety score is unavailable for the selected warning threshold."
+    try:
+        score = float(raw_score)
+    except (TypeError, ValueError):
+        return "info", "Evaluation safety score is unavailable for the selected warning threshold."
+    if score >= threshold:
+        return None
+    return (
+        "warning",
+        (
+            f"Global safety score {_format_display_value(score)} is below the "
+            f"{_format_display_value(threshold)} warning threshold. Search results are still shown."
+        ),
+    )
+
+
 def _statement_records(statements: pd.DataFrame | list[dict]) -> list[dict]:
     if isinstance(statements, pd.DataFrame):
         return statements.to_dict("records")
@@ -1094,6 +1144,9 @@ def _graph_node_color(node_type: str) -> str:
 def main() -> None:
     st.set_page_config(page_title="ResearchNavigator Agent", layout="wide")
     _inject_global_styles()
+    ui_settings = _load_ui_settings()
+    default_search_query = str(ui_settings["default_search_query"])
+    max_search_results = int(ui_settings["max_search_results"])
     data = _load_app_data()
     processed_data = {key: data[key] for key in ("papers", "chunks", "statements")}
     discovery = {
@@ -1147,36 +1200,69 @@ def main() -> None:
             "Results are ranked across papers, statements, gaps, hypotheses, and experiment plans.",
             "Discovery",
         )
-        query = st.text_input(
-            "Research question or keyword",
-            placeholder="Find research gaps related to evaluation of AI-generated hypotheses",
+        if "search_query" not in st.session_state:
+            st.session_state["search_query"] = default_search_query
+        paper_options = ["all"] + sorted(
+            str(item)
+            for item in data["papers"].get("paper_id", pd.Series(dtype=str)).dropna().unique()
         )
-        filter_cols = st.columns(4)
-        statement_type = filter_cols[0].selectbox("Statement type", STATEMENT_TYPES)
-        result_type = filter_cols[1].selectbox("Result type", RESULT_TYPES)
-        min_safety_score = filter_cols[2].slider("Minimum safety score", 0.0, 1.0, 0.0, 0.1)
-        paper_options = ["all"] + sorted(str(item) for item in data["papers"].get("paper_id", pd.Series(dtype=str)).dropna().unique())
-        paper_id = filter_cols[3].selectbox("Paper", paper_options)
-        search_clicked = st.button("Search", type="primary")
+        with st.form("search_controls"):
+            query = st.text_input(
+                "Research question or keyword",
+                placeholder="Find research gaps related to evaluation of AI-generated hypotheses",
+                key="search_query",
+            )
+            filter_cols = st.columns(4)
+            statement_type = filter_cols[0].selectbox("Statement type", STATEMENT_TYPES)
+            result_type = filter_cols[1].selectbox("Result type", RESULT_TYPES)
+            safety_threshold = filter_cols[2].slider(
+                "Global safety warning threshold",
+                0.0,
+                1.0,
+                0.0,
+                0.1,
+                help=(
+                    "Compares against evaluation_report.safety_score; search results do not "
+                    "have per-result safety scores."
+                ),
+            )
+            paper_id = filter_cols[3].selectbox("Paper", paper_options)
+            search_submitted = st.form_submit_button("Search", type="primary")
 
-        if evaluation.get("safety_score", 0) and float(evaluation.get("safety_score", 0)) < min_safety_score:
-            st.warning("Current evaluation safety score is below the selected threshold.")
+        safety_message = _global_safety_threshold_message(evaluation, safety_threshold)
+        if safety_message:
+            tone, message = safety_message
+            if tone == "warning":
+                st.warning(message)
+            else:
+                st.info(message)
 
-        results_by_type = search_all(
-            query if search_clicked or query else "",
-            data,
-            {
-                "statement_type": statement_type,
-                "result_type": result_type,
-                "paper_id": paper_id,
-            },
-        )
-        results = _flatten_results(results_by_type, query)
-        if query:
+        if search_submitted:
+            results_by_type = search_all(
+                query,
+                data,
+                {
+                    "statement_type": statement_type,
+                    "result_type": result_type,
+                    "paper_id": paper_id,
+                },
+            )
+            all_results = _flatten_results(results_by_type, query)
+            results, limit_message = _limit_search_results(all_results, max_search_results)
+            st.session_state["last_search_query"] = query
+            st.session_state["last_search_results"] = results
+            st.session_state["last_search_limit_message"] = limit_message
+
+        active_query = st.session_state.get("last_search_query", "")
+        results = st.session_state.get("last_search_results", [])
+        limit_message = st.session_state.get("last_search_limit_message")
+        if str(active_query).strip():
             _discovery_summary(results)
+            if limit_message:
+                st.caption(limit_message)
             if not results:
                 st.info("No local matches found. Try a broader keyword or run the processing pipeline.")
-            for result_index, result in enumerate(results[:30]):
+            for result_index, result in enumerate(results):
                 _result_card(result, data, result_index)
         else:
             st.markdown(
@@ -1190,7 +1276,6 @@ def main() -> None:
                 """,
                 unsafe_allow_html=True,
             )
-        st.session_state["last_search_results"] = results
 
     with tabs[2]:
         _section_header(

@@ -8,6 +8,9 @@ from ui.streamlit_app import (
     _available_statement_ids,
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
+    _global_safety_threshold_message,
+    _limit_search_results,
+    _load_ui_settings,
     _render_dataframe,
     _render_plotly_chart,
     _statement_option_label,
@@ -205,6 +208,74 @@ def test_evaluation_status_passes_only_without_failures_warnings_or_grounding_ca
     assert status["key"] == "passed"
     assert status["headline"] == "Checks passed"
     assert status["tone"] == "good"
+
+
+def test_ui_settings_read_default_query_and_result_limit_from_config(tmp_path):
+    config_path = tmp_path / "default.yaml"
+    config_path.write_text(
+        """
+version: 1
+paths:
+  papers_dir: data/papers
+  db_path: data/processed/papers.sqlite
+  graph_path: data/processed/research_graph.graphml
+  discovery_path: data/processed/gaps_and_hypotheses.json
+  evaluation_path: data/processed/evaluation_report.json
+  golden_eval_path: data/processed/golden_eval_report.json
+  brief_path: data/processed/researchnavigator_brief.md
+  sample_outputs_dir: docs/sample_outputs
+  screenshots_dir: docs/screenshots
+pipeline:
+  max_statements_per_type_per_paper: 30
+  max_gaps: 10
+  max_hypotheses: 10
+  max_graph_nodes: 3000
+  allow_graph_truncate: false
+evaluation:
+  min_overall_score: 0.75
+  min_golden_pass_rate: 1.0
+ui:
+  default_search_query: default dataset query
+  max_search_results: 7
+""",
+        encoding="utf-8",
+    )
+
+    settings = _load_ui_settings(config_path)
+
+    assert settings == {
+        "default_search_query": "default dataset query",
+        "max_search_results": 7,
+    }
+
+
+def test_search_result_limit_returns_configured_window_and_message():
+    results = [{"result_id": f"result_{index}"} for index in range(5)]
+
+    limited_results, message = _limit_search_results(results, max_results=3)
+
+    assert [result["result_id"] for result in limited_results] == [
+        "result_0",
+        "result_1",
+        "result_2",
+    ]
+    assert message == "Showing top 3 of 5 local matches."
+
+
+def test_global_safety_threshold_message_describes_warning_without_filtering():
+    assert _global_safety_threshold_message({"safety_score": 0.8}, 0.7) is None
+    assert _global_safety_threshold_message({}, 0.0) is None
+    assert _global_safety_threshold_message({}, 0.5) == (
+        "info",
+        "Evaluation safety score is unavailable for the selected warning threshold.",
+    )
+
+    warning = _global_safety_threshold_message({"safety_score": 0.6}, 0.8)
+
+    assert warning == (
+        "warning",
+        "Global safety score 0.6 is below the 0.8 warning threshold. Search results are still shown.",
+    )
 
 
 def test_evidence_statement_ids_for_result_prefers_direct_and_related_ids():
