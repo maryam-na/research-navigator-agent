@@ -7,6 +7,7 @@ from tools.storage_tools import initialize_database, save_chunk, save_paper, sav
 from ui.streamlit_app import (
     _render_dataframe,
     _render_plotly_chart,
+    _subgraph_for_results,
     build_small_subgraph,
     dashboard_counts,
     file_presence,
@@ -71,6 +72,58 @@ def test_graph_loading_summary_and_tables(tmp_path):
     assert len(build_small_subgraph(loaded_graph, max_nodes=1).nodes) == 1
     assert len(nodes_df) == 2
     assert len(edges_df) == 1
+
+
+def test_overview_subgraph_prefers_connected_edges():
+    graph = nx.DiGraph()
+    graph.add_node("dataset:orphan_001", node_type="dataset")
+    graph.add_node("dataset:orphan_002", node_type="dataset")
+    graph.add_node("method:stmt_method", node_type="method", statement_id="stmt_method")
+    graph.add_node("result:stmt_result", node_type="result", statement_id="stmt_result")
+    graph.add_edge("method:stmt_method", "result:stmt_result", relation="supports")
+
+    subgraph = build_small_subgraph(graph, max_nodes=4)
+
+    assert subgraph.number_of_edges() == 1
+    assert ("method:stmt_method", "result:stmt_result") in subgraph.edges
+
+
+def test_search_linked_subgraph_preserves_incident_edges():
+    graph = nx.DiGraph()
+    graph.add_node("paper:paper_001", node_type="paper", paper_id="paper_001")
+    graph.add_node(
+        "statement:stmt_limitation",
+        node_type="statement",
+        statement_id="stmt_limitation",
+        paper_id="paper_001",
+    )
+    graph.add_node(
+        "limitation:stmt_limitation",
+        node_type="limitation",
+        statement_id="stmt_limitation",
+        paper_id="paper_001",
+    )
+    graph.add_node(
+        "result:stmt_result",
+        node_type="result",
+        statement_id="stmt_result",
+        paper_id="paper_001",
+    )
+    graph.add_edge("paper:paper_001", "statement:stmt_limitation", relation="contains")
+    graph.add_edge("result:stmt_result", "limitation:stmt_limitation", relation="limited_by")
+    result = {
+        "result_type": "statement",
+        "result_id": "stmt_limitation",
+        "statement_id": "stmt_limitation",
+        "statement_type": "limitation",
+        "paper_id": "paper_001",
+    }
+
+    subgraph = _subgraph_for_results(graph, [result], max_nodes=4)
+
+    assert subgraph.number_of_edges() == 2
+    assert ("paper:paper_001", "statement:stmt_limitation") in subgraph.edges
+    assert ("result:stmt_result", "limitation:stmt_limitation") in subgraph.edges
 
 
 def test_dashboard_counts_and_file_presence(tmp_path):

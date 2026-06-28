@@ -317,7 +317,22 @@ def summarize_graph_from_path(path: str | Path = DEFAULT_GRAPH_PATH) -> dict:
 
 
 def build_small_subgraph(graph: nx.DiGraph, max_nodes: int = 40) -> nx.DiGraph:
-    selected_nodes = sorted(str(node_id) for node_id in graph.nodes())[:max_nodes]
+    if max_nodes <= 0:
+        return nx.DiGraph()
+    selected_nodes: list[str] = []
+    selected_lookup: set[str] = set()
+    for source, target, _attrs in _sorted_graph_edges(graph):
+        if len(selected_lookup) >= max_nodes:
+            break
+        for node_id in (str(source), str(target)):
+            if node_id in selected_lookup:
+                continue
+            if len(selected_lookup) >= max_nodes:
+                break
+            selected_lookup.add(node_id)
+            selected_nodes.append(node_id)
+    if not selected_nodes:
+        selected_nodes = sorted(str(node_id) for node_id in graph.nodes())[:max_nodes]
     return graph.subgraph(selected_nodes).copy()
 
 
@@ -470,20 +485,111 @@ def _discovery_summary(results: list[dict]) -> None:
 
 
 def _subgraph_for_results(graph: nx.DiGraph, results: list[dict], max_nodes: int = 50) -> nx.DiGraph:
-    candidate_nodes: set[str] = set()
+    if max_nodes <= 0:
+        return nx.DiGraph()
+    seed_groups: list[list[str]] = []
     for result in results:
-        candidate_nodes.update(_related_graph_nodes(result))
+        candidate_nodes = _related_graph_nodes(result)
         for evidence_id in result.get("evidence_statement_ids", []) or []:
-            candidate_nodes.add(f"statement:{evidence_id}")
-    existing = [node for node in candidate_nodes if node in graph]
-    if not existing:
+            candidate_nodes.append(f"statement:{evidence_id}")
+            candidate_nodes.extend(_semantic_nodes_for_statement(graph, str(evidence_id)))
+        seed_groups.append(_unique_existing_nodes(graph, candidate_nodes))
+    seed_groups = [group for group in seed_groups if group]
+    if not seed_groups:
         return build_small_subgraph(graph, max_nodes=max_nodes)
-    expanded = set(existing)
-    for node in existing:
-        expanded.update(str(neighbor) for neighbor in graph.successors(node))
-        expanded.update(str(neighbor) for neighbor in graph.predecessors(node))
-    selected = sorted(expanded)[:max_nodes]
-    return graph.subgraph(selected).copy()
+    selected_nodes = _select_edge_preserving_nodes(graph, seed_groups, max_nodes)
+    return graph.subgraph(selected_nodes).copy()
+
+
+def _unique_existing_nodes(graph: nx.DiGraph, node_ids: list[str]) -> list[str]:
+    existing_nodes: list[str] = []
+    seen: set[str] = set()
+    for node_id in node_ids:
+        if node_id in seen or node_id not in graph:
+            continue
+        seen.add(node_id)
+        existing_nodes.append(node_id)
+    return existing_nodes
+
+
+def _semantic_nodes_for_statement(graph: nx.DiGraph, statement_id: str) -> list[str]:
+    semantic_nodes = []
+    for node_id, attrs in graph.nodes(data=True):
+        if str(attrs.get("statement_id", "")) != statement_id:
+            continue
+        if str(attrs.get("node_type", "")) == "statement":
+            continue
+        semantic_nodes.append(str(node_id))
+    return sorted(semantic_nodes, key=lambda node_id: _graph_node_sort_key(graph, node_id))
+
+
+def _select_edge_preserving_nodes(
+    graph: nx.DiGraph,
+    seed_groups: list[list[str]],
+    max_nodes: int,
+) -> list[str]:
+    selected_nodes: list[str] = []
+    selected_lookup: set[str] = set()
+
+    def add_node(node_id: str) -> bool:
+        if node_id in selected_lookup:
+            return True
+        if len(selected_lookup) >= max_nodes:
+            return False
+        selected_lookup.add(node_id)
+        selected_nodes.append(node_id)
+        return True
+
+    for seed_group in seed_groups:
+        for seed_node in seed_group:
+            add_node(seed_node)
+        for edge in _incident_edges_for_nodes(graph, seed_group):
+            source, target, _attrs = edge
+            if not add_node(str(source)):
+                break
+            if not add_node(str(target)):
+                break
+        if len(selected_lookup) >= max_nodes:
+            break
+    return selected_nodes
+
+
+def _incident_edges_for_nodes(graph: nx.DiGraph, node_ids: list[str]) -> list[tuple[str, str, dict]]:
+    node_lookup = set(node_ids)
+    edges = [
+        (str(source), str(target), attrs)
+        for source, target, attrs in graph.edges(data=True)
+        if str(source) in node_lookup or str(target) in node_lookup
+    ]
+    return sorted(edges, key=_edge_sort_key)
+
+
+def _sorted_graph_edges(graph: nx.DiGraph) -> list[tuple[str, str, dict]]:
+    return sorted(
+        ((str(source), str(target), attrs) for source, target, attrs in graph.edges(data=True)),
+        key=_edge_sort_key,
+    )
+
+
+def _edge_sort_key(edge: tuple[str, str, dict]) -> tuple[int, str, str]:
+    source, target, attrs = edge
+    relation_priority = {
+        "supports": 0,
+        "limited_by": 1,
+        "motivates": 2,
+        "used_by": 3,
+        "contains": 4,
+    }
+    return (relation_priority.get(str(attrs.get("relation", "")), 9), str(source), str(target))
+
+
+def _graph_node_sort_key(graph: nx.DiGraph, node_id: str) -> tuple[str, str, str]:
+    attrs = graph.nodes[node_id]
+    return (
+        str(attrs.get("paper_id", "")),
+        str(attrs.get("node_type", "")),
+        str(node_id),
+    )
 
 
 def _render_graph(graph: nx.DiGraph) -> None:
@@ -491,6 +597,11 @@ def _render_graph(graph: nx.DiGraph) -> None:
     if graph.number_of_nodes() == 0:
         st.info("No graph data available yet.")
         return
+    if graph.number_of_edges() == 0:
+        st.warning(
+            "This graph sample has nodes but no visible relationships. Try a search result with "
+            "linked evidence or rerun graph generation."
+        )
     try:
         import plotly.graph_objects as go
 
@@ -517,10 +628,89 @@ def _render_graph(graph: nx.DiGraph) -> None:
         fig.update_layout(showlegend=False, margin={"l": 0, "r": 0, "t": 10, "b": 0}, height=520)
         _render_plotly_chart(fig)
     except Exception:
-        st.info("Interactive graph rendering is unavailable. Showing graph tables instead.")
+        st.info("Interactive graph rendering is unavailable. Showing a local static preview.")
+        _render_static_graph_svg(graph)
     with st.expander("Node and edge tables"):
         _render_dataframe(nodes_df)
         _render_dataframe(edges_df)
+
+
+def _render_static_graph_svg(graph: nx.DiGraph) -> None:
+    if graph.number_of_nodes() == 0:
+        return
+    positions = nx.spring_layout(graph, seed=7)
+    width = 920
+    height = 520
+    padding = 42
+    points = list(positions.values())
+    min_x = min(point[0] for point in points)
+    max_x = max(point[0] for point in points)
+    min_y = min(point[1] for point in points)
+    max_y = max(point[1] for point in points)
+
+    def scale(value: float, low: float, high: float, output_low: float, output_high: float) -> float:
+        if high == low:
+            return (output_low + output_high) / 2
+        return output_low + ((value - low) / (high - low)) * (output_high - output_low)
+
+    scaled_positions = {
+        node_id: (
+            scale(position[0], min_x, max_x, padding, width - padding),
+            scale(position[1], min_y, max_y, height - padding, padding),
+        )
+        for node_id, position in positions.items()
+    }
+    edge_markup = []
+    for source, target, attrs in _sorted_graph_edges(graph):
+        x1, y1 = scaled_positions[source]
+        x2, y2 = scaled_positions[target]
+        relation = html.escape(str(attrs.get("relation", "")))
+        edge_markup.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}">'
+            f"<title>{relation}</title></line>"
+        )
+    node_markup = []
+    for node_id, attrs in sorted(graph.nodes(data=True), key=lambda item: str(item[0])):
+        x, y = scaled_positions[str(node_id)]
+        label = html.escape(_short_graph_label(str(node_id)))
+        node_type = str(attrs.get("node_type", "unknown"))
+        color = _graph_node_color(node_type)
+        node_markup.append(
+            f'<g><circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{color}">'
+            f"<title>{html.escape(str(node_id))}</title></circle>"
+            f'<text x="{x + 10:.1f}" y="{y + 4:.1f}">{label}</text></g>'
+        )
+    svg = (
+        f'<svg class="rn-static-graph" viewBox="0 0 {width} {height}" '
+        'role="img" aria-label="Static knowledge graph preview">'
+        "<defs><style>"
+        ".rn-static-graph{width:100%;height:auto;border:1px solid #d8dee8;border-radius:8px;"
+        "background:#ffffff}.rn-static-graph line{stroke:#94a3b8;stroke-width:1.2;"
+        "opacity:.72}.rn-static-graph text{font:11px sans-serif;fill:#334155}"
+        "</style></defs>"
+        f'{"".join(edge_markup)}{"".join(node_markup)}</svg>'
+    )
+    st.markdown(svg, unsafe_allow_html=True)
+
+
+def _short_graph_label(node_id: str, max_chars: int = 30) -> str:
+    label = node_id.split(":", 1)[-1]
+    if len(label) <= max_chars:
+        return label
+    return label[: max_chars - 3] + "..."
+
+
+def _graph_node_color(node_type: str) -> str:
+    return {
+        "paper": "#1d4ed8",
+        "statement": "#64748b",
+        "method": "#0f766e",
+        "result": "#7c3aed",
+        "limitation": "#b91c1c",
+        "future_work": "#b45309",
+        "dataset": "#0369a1",
+        "background": "#475569",
+    }.get(node_type, "#334155")
 
 
 def main() -> None:
