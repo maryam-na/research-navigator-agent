@@ -5,6 +5,8 @@ import networkx as nx
 from tools.graph_tools import export_graphml
 from tools.storage_tools import initialize_database, save_chunk, save_paper, save_statement
 from ui.streamlit_app import (
+    _render_dataframe,
+    _render_plotly_chart,
     build_small_subgraph,
     dashboard_counts,
     file_presence,
@@ -95,3 +97,39 @@ def test_load_json_file_reads_payload(tmp_path):
     json_path.write_text(json.dumps({"gaps": []}), encoding="utf-8")
 
     assert load_json_file(json_path) == {"gaps": []}
+
+
+def test_render_dataframe_falls_back_for_legacy_streamlit_width(monkeypatch):
+    calls = []
+
+    def fake_dataframe(data, **kwargs):
+        calls.append((data, kwargs))
+        if kwargs.get("width") == "stretch":
+            raise TypeError("'str' object cannot be interpreted as an integer")
+
+    monkeypatch.setattr("ui.streamlit_app.st.dataframe", fake_dataframe)
+
+    _render_dataframe({"rows": []})
+
+    assert calls == [
+        ({"rows": []}, {"width": "stretch"}),
+        ({"rows": []}, {"use_container_width": True}),
+    ]
+
+
+def test_render_plotly_chart_falls_back_for_legacy_streamlit_width(monkeypatch):
+    calls = []
+
+    def fake_plotly_chart(fig, **kwargs):
+        calls.append((fig, kwargs))
+        if kwargs.get("width") == "stretch":
+            raise TypeError("'str' object cannot be interpreted as an integer")
+
+    monkeypatch.setattr("ui.streamlit_app.st.plotly_chart", fake_plotly_chart)
+
+    _render_plotly_chart("figure")
+
+    assert calls == [
+        ("figure", {"width": "stretch"}),
+        ("figure", {"use_container_width": True}),
+    ]

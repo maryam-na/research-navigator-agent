@@ -355,6 +355,28 @@ def _show_pipeline_instructions() -> None:
     st.code("\n".join(PIPELINE_COMMANDS), language="bash")
 
 
+def _is_legacy_streamlit_width_error(error: TypeError) -> bool:
+    return "'str' object cannot be interpreted as an integer" in str(error)
+
+
+def _render_dataframe(data: object) -> None:
+    try:
+        st.dataframe(data, width="stretch")
+    except TypeError as error:
+        if not _is_legacy_streamlit_width_error(error):
+            raise
+        st.dataframe(data, use_container_width=True)
+
+
+def _render_plotly_chart(fig: object) -> None:
+    try:
+        st.plotly_chart(fig, width="stretch")
+    except TypeError as error:
+        if not _is_legacy_streamlit_width_error(error):
+            raise
+        st.plotly_chart(fig, use_container_width=True)
+
+
 def _metric_cards(items: list[tuple[str, object]], columns: int = 4) -> None:
     del columns
     cards = []
@@ -493,12 +515,12 @@ def _render_graph(graph: nx.DiGraph) -> None:
             )
         )
         fig.update_layout(showlegend=False, margin={"l": 0, "r": 0, "t": 10, "b": 0}, height=520)
-        st.plotly_chart(fig, width="stretch")
+        _render_plotly_chart(fig)
     except Exception:
         st.info("Interactive graph rendering is unavailable. Showing graph tables instead.")
     with st.expander("Node and edge tables"):
-        st.dataframe(nodes_df, width="stretch")
-        st.dataframe(edges_df, width="stretch")
+        _render_dataframe(nodes_df)
+        _render_dataframe(edges_df)
 
 
 def main() -> None:
@@ -666,7 +688,7 @@ def main() -> None:
                 st.write(gap.get("gap_text"))
                 with st.expander("Inspect evidence"):
                     evidence = evidence_for_statement_ids(gap.get("source_statement_ids", []), data["statements"])
-                    st.dataframe(pd.DataFrame(evidence), width="stretch")
+                    _render_dataframe(pd.DataFrame(evidence))
         _section_header("Hypotheses", "Candidate hypotheses remain speculative and linked to local evidence.", "Experiment design")
         for hypothesis in data["hypotheses"]:
             with st.container(border=True):
@@ -677,7 +699,7 @@ def main() -> None:
                 )
                 with st.expander("Evidence and experiment plan"):
                     evidence = evidence_for_statement_ids(hypothesis.get("evidence_statement_ids", []), data["statements"])
-                    st.dataframe(pd.DataFrame(evidence), width="stretch")
+                    _render_dataframe(pd.DataFrame(evidence))
                     plans = [
                         item
                         for item in data["experiment_plans"]
@@ -697,12 +719,12 @@ def main() -> None:
             st.info("No themes available yet.")
         else:
             theme_df = pd.DataFrame(themes)
-            st.dataframe(theme_df, width="stretch")
+            _render_dataframe(theme_df)
             selected_theme = st.selectbox("Explore theme", [item["theme"] for item in themes])
             theme = next(item for item in themes if item["theme"] == selected_theme)
             evidence = evidence_for_statement_ids(theme["representative_statement_ids"], data["statements"])
             st.markdown("#### Representative evidence")
-            st.dataframe(pd.DataFrame(evidence), width="stretch")
+            _render_dataframe(pd.DataFrame(evidence))
 
     with tabs[4]:
         search_results = st.session_state.get("last_search_results", [])
@@ -746,12 +768,12 @@ def main() -> None:
             warnings = evaluation.get("warnings", [])
             if warnings:
                 st.warning("The evaluator found caveats even if required checks passed.")
-                st.dataframe(pd.DataFrame(warnings), width="stretch")
+                _render_dataframe(pd.DataFrame(warnings))
             with st.expander("Metric details"):
                 st.json(evaluation.get("metric_details", {}))
             if failed_checks:
                 st.error("Failed checks require review.")
-                st.dataframe(pd.DataFrame(failed_checks), width="stretch")
+                _render_dataframe(pd.DataFrame(failed_checks))
             else:
                 st.success("No deterministic safety failures detected.")
 
@@ -767,30 +789,28 @@ def main() -> None:
         st.caption(agent_story["orchestration_pattern"])
         with st.expander("Agent instruction and safety boundaries", expanded=True):
             st.write(agent_story["model_policy"])
-            st.dataframe(
+            _render_dataframe(
                 pd.DataFrame(
                     {
                         "course_concept": agent_story["course_concepts"],
                     }
-                ),
-                width="stretch",
+                )
             )
-            st.dataframe(
+            _render_dataframe(
                 pd.DataFrame(
                     {
                         "safety_boundary": agent_story["safety_boundaries"],
                     }
-                ),
-                width="stretch",
+                )
             )
         _section_header("ADK-facing tool manifest", "Callable tools exposed through the local agent layer.", "Tools")
-        st.dataframe(pd.DataFrame(agent_story["tools"]), width="stretch")
+        _render_dataframe(pd.DataFrame(agent_story["tools"]))
         _section_header(
             "Planned tool trajectory",
             "Deterministic orchestration path for a research-discovery request.",
             "Trajectory",
         )
-        st.dataframe(pd.DataFrame(trajectory["steps"]), width="stretch")
+        _render_dataframe(pd.DataFrame(trajectory["steps"]))
         st.caption("Final answer contract: " + " | ".join(trajectory["final_answer_contract"]))
 
         mcp_manifest = mcp_tool_manifest()
@@ -807,14 +827,14 @@ def main() -> None:
             ],
             columns=3,
         )
-        st.dataframe(pd.DataFrame(mcp_manifest), width="stretch")
+        _render_dataframe(pd.DataFrame(mcp_manifest))
         st.code("uv run python -m scripts.run_mcp_server", language="bash")
 
         _section_header("Pipeline steps", "Backend processing stages and generated artifact status.", "Operations")
         status = build_ingestion_status(data)
         if not status.empty:
             _section_header("Paper ingestion status")
-            st.dataframe(status, width="stretch")
+            _render_dataframe(status)
         st.write(
             pd.DataFrame(
                 {
@@ -833,15 +853,14 @@ def main() -> None:
             )
         )
         st.markdown("### Generated files")
-        st.dataframe(
-            file_presence([DEFAULT_DB_PATH, DEFAULT_GRAPH_PATH, DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH]),
-            width="stretch",
+        _render_dataframe(
+            file_presence([DEFAULT_DB_PATH, DEFAULT_GRAPH_PATH, DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH])
         )
         st.markdown("### Commands")
         st.code("\n".join(PIPELINE_COMMANDS), language="bash")
         with st.expander("Raw backend tables"):
-            st.dataframe(data["papers"], width="stretch")
-            st.dataframe(data["statements"], width="stretch")
+            _render_dataframe(data["papers"])
+            _render_dataframe(data["statements"])
 
 
 if __name__ == "__main__":
