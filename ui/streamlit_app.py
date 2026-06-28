@@ -50,6 +50,11 @@ from ui.data_access import (
 from ui.data_access import (
     load_processed_data as _load_processed_bundle,
 )
+from ui.pipeline_runner import (
+    LocalPipelineRunResult,
+    run_local_pipeline,
+    validate_local_pipeline_config,
+)
 
 DEFAULT_DB_PATH = Path("data/processed/papers.sqlite")
 DEFAULT_GRAPH_PATH = Path("data/processed/research_graph.graphml")
@@ -62,6 +67,7 @@ STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "data
 RESULT_TYPES = ["all", "statements", "gaps", "hypotheses", "experiment_plans"]
 SELECTED_EVIDENCE_KEY = "selected_evidence_statement_id"
 SELECTED_EVIDENCE_SOURCE_KEY = "selected_evidence_source"
+LAST_PIPELINE_RUN_KEY = "last_local_pipeline_run"
 PIPELINE_COMMANDS = [
     "uv run python -m scripts.ingest_papers --papers-dir data/papers --db-path data/processed/papers.sqlite --extract-statements --filter-statements --max-statements-per-type-per-paper 30",
     "uv run python -m scripts.build_graph --db-path data/processed/papers.sqlite --graph-path data/processed/research_graph.graphml",
@@ -662,6 +668,95 @@ def _render_artifact_status_table(readiness: dict[str, object]) -> None:
         for item in artifacts
     ]
     _render_dataframe(pd.DataFrame(rows))
+
+
+def _clear_app_data_cache() -> None:
+    clear = getattr(_load_app_data, "clear", None)
+    if callable(clear):
+        clear()
+
+
+def _render_pipeline_run_control(section_key: str) -> None:
+    validation = validate_local_pipeline_config(DEFAULT_CONFIG_PATH)
+    with st.container(border=True):
+        st.markdown("#### Run local pipeline")
+        for warning in validation.warnings:
+            st.warning(warning)
+        for error in validation.errors:
+            st.error(error)
+        reset_existing = st.checkbox(
+            "Reset processed artifacts before running",
+            value=True,
+            key=f"{section_key}-reset-pipeline",
+            help="Matches `make demo` behavior by rebuilding local processed outputs.",
+        )
+        button_cols = st.columns([1, 3])
+        run_clicked = button_cols[0].button(
+            "Run local pipeline",
+            type="primary",
+            disabled=not validation.ok,
+            key=f"{section_key}-run-pipeline",
+        )
+        button_cols[1].caption(
+            "Runs ingestion, graph building, gap discovery, evaluation, "
+            "and brief generation locally."
+        )
+        last_result = st.session_state.get(LAST_PIPELINE_RUN_KEY)
+        if isinstance(last_result, LocalPipelineRunResult):
+            _render_pipeline_run_result(last_result)
+        if run_clicked:
+            status = st.status("Running local pipeline...", expanded=True)
+
+            def show_progress(_stage: str, message: str) -> None:
+                status.write(message)
+
+            with status:
+                result = run_local_pipeline(
+                    config_path=DEFAULT_CONFIG_PATH,
+                    reset=reset_existing,
+                    progress_callback=show_progress,
+                )
+                st.session_state[LAST_PIPELINE_RUN_KEY] = result
+                if result.ok:
+                    _clear_app_data_cache()
+                    status.update(label="Local pipeline completed.", state="complete")
+                    st.rerun()
+                status.update(label="Local pipeline failed.", state="error")
+                _render_pipeline_run_result(result)
+
+
+def _render_pipeline_run_result(result: LocalPipelineRunResult) -> None:
+    if result.ok:
+        st.success(result.message)
+    else:
+        st.error(result.message)
+    for warning in result.warnings:
+        st.warning(warning)
+    for error in result.errors:
+        st.error(error)
+    if result.summary:
+        _metric_cards(
+            [
+                ("Papers", result.summary.get("papers", "n/a")),
+                ("Statements", result.summary.get("saved_statements", "n/a")),
+                ("Graph nodes", result.summary.get("graph", {}).get("nodes", "n/a")),
+                ("Gaps", result.summary.get("discovery_counts", {}).get("gaps", "n/a")),
+                (
+                    "Hypotheses",
+                    result.summary.get("discovery_counts", {}).get("hypotheses", "n/a"),
+                ),
+                (
+                    "Overall score",
+                    result.summary.get("evaluation", {}).get("overall_score", "n/a"),
+                ),
+            ],
+            columns=3,
+        )
+        with st.expander("Pipeline summary", expanded=False):
+            st.json(result.summary)
+    if result.artifact_paths:
+        with st.expander("Regenerated artifact paths", expanded=False):
+            st.json(result.artifact_paths)
 
 
 def _artifact_by_key(readiness: dict[str, object], artifact_key: str) -> dict | None:
@@ -1272,10 +1367,14 @@ def _render_corpus_setup() -> None:
             )
         )
 
-    st.markdown("#### Process locally")
+    _render_pipeline_run_control("corpus")
+    st.markdown("#### Terminal fallback")
     st.code("\n".join(PIPELINE_COMMANDS[:-1]), language="bash")
     if not DEFAULT_DB_PATH.exists():
-        st.info("Processed artifacts are missing. Run the local commands above after saving the corpus.")
+        st.info(
+            "Processed artifacts are missing. Use the Run local pipeline button or run the "
+            "local commands above after saving the corpus."
+        )
 
 
 def _render_corpus_status_message(status: dict) -> None:
@@ -2445,6 +2544,7 @@ def main() -> None:
                     ]
                 )
             )
+        _render_pipeline_run_control("pipeline")
         st.markdown("### Commands")
         st.code("\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND]), language="bash")
         with st.expander("Raw backend tables"):

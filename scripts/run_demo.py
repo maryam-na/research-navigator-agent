@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -17,6 +18,17 @@ from scripts.ingest_papers import ingest_papers
 from tools.config_tools import load_config
 from tools.logging_tools import log_error, log_info
 from ui.data_access import create_research_brief, load_processed_data
+
+ProgressCallback = Callable[[str, str], None]
+
+
+def _notify_progress(
+    progress_callback: ProgressCallback | None,
+    stage: str,
+    message: str,
+) -> None:
+    if progress_callback is not None:
+        progress_callback(stage, message)
 
 
 def _resolve_local_path(path_value: str, label: str) -> Path:
@@ -39,6 +51,7 @@ def run_demo(
     max_gaps: int = 10,
     max_hypotheses: int = 10,
     reset: bool = False,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict:
     """Run ingestion, graph building, gap discovery, and evaluation."""
 
@@ -52,11 +65,17 @@ def run_demo(
         _resolve_local_path(evaluation_path, "evaluation_path"),
     ]
     if reset:
+        _notify_progress(
+            progress_callback,
+            "reset_started",
+            "Removing existing processed artifacts before the local pipeline run.",
+        )
         log_info("demo.reset_started", "Removing existing processed outputs.")
         for path in output_paths:
             if path.exists() and path.is_file():
                 path.unlink()
 
+    _notify_progress(progress_callback, "ingest_started", "Ingesting local PDFs into SQLite.")
     log_info("demo.ingest_started", papers_dir=papers_dir, db_path=db_path)
     ingestion = ingest_papers(
         papers_dir,
@@ -73,6 +92,11 @@ def run_demo(
         saved_statements=ingestion.statements,
         skipped_files=ingestion.skipped_files,
     )
+    _notify_progress(
+        progress_callback,
+        "graph_started",
+        "Building the local NetworkX knowledge graph.",
+    )
     log_info("demo.graph_started", graph_path=graph_path)
     graph_summary = build_graph_from_database(db_path, graph_path)
     log_info(
@@ -80,6 +104,11 @@ def run_demo(
         nodes=graph_summary.get("nodes"),
         edges=graph_summary.get("edges"),
         exported=graph_summary.get("exported"),
+    )
+    _notify_progress(
+        progress_callback,
+        "discovery_started",
+        "Finding grounded gaps and speculative hypotheses.",
     )
     log_info("demo.discovery_started", max_gaps=max_gaps, max_hypotheses=max_hypotheses)
     discovery = discover_from_database(
@@ -94,6 +123,11 @@ def run_demo(
         hypotheses=discovery["counts"].get("hypotheses"),
         experiment_plans=discovery["counts"].get("experiment_plans"),
     )
+    _notify_progress(
+        progress_callback,
+        "evaluation_started",
+        "Evaluating grounding, safety, testability, and traceability.",
+    )
     log_info("demo.evaluation_started", output_path=evaluation_path)
     evaluation = evaluate_from_files(db_path, discovery_path, evaluation_path)
     log_info(
@@ -101,6 +135,11 @@ def run_demo(
         overall_score=evaluation.get("overall_score"),
         warnings=len(evaluation.get("warnings", [])),
         failed_checks=len(evaluation.get("failed_checks", [])),
+    )
+    _notify_progress(
+        progress_callback,
+        "brief_started",
+        "Writing the local Markdown research brief.",
     )
     processed_data = load_processed_data(
         db_path,
@@ -112,6 +151,7 @@ def run_demo(
     brief_output.parent.mkdir(parents=True, exist_ok=True)
     brief_output.write_text(create_research_brief(processed_data), encoding="utf-8")
     log_info("demo.brief_written", brief_path=str(brief_output))
+    _notify_progress(progress_callback, "completed", "Local pipeline completed.")
     return {
         "papers": ingestion.papers,
         "chunks": ingestion.chunks,
@@ -144,7 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-statements-per-type-per-paper", type=int, default=None)
     parser.add_argument("--max-gaps", type=int, default=None)
     parser.add_argument("--max-hypotheses", type=int, default=None)
-    parser.add_argument("--reset", action="store_true", help="Remove existing processed outputs first.")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Remove existing processed outputs first.",
+    )
     return parser
 
 
@@ -188,7 +232,11 @@ def main(argv: list[str] | None = None) -> int:
         failed_checks=summary["evaluation"]["failed_checks"],
         brief=summary["brief_path"],
     )
-    log_info("demo.next_step", "Open the dashboard.", command="uv run streamlit run ui/streamlit_app.py")
+    log_info(
+        "demo.next_step",
+        "Open the dashboard.",
+        command="uv run streamlit run ui/streamlit_app.py",
+    )
     return 0
 
 

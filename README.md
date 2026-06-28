@@ -23,7 +23,9 @@ uv run streamlit run ui/streamlit_app.py
 ```
 
 Open `Corpus Setup` in the dashboard to add or replace permitted local PDFs under `data/papers/`.
-The app keeps uploads local, updates `data/papers/manifest.json`, and shows the backend commands to regenerate processed artifacts.
+The app keeps uploads local, updates `data/papers/manifest.json`, and provides a **Run local pipeline**
+button to regenerate processed artifacts without leaving the UI. The terminal commands remain available
+in `Pipeline Trace` as a fallback and for reproducible demos.
 
 Run deterministic golden cases:
 
