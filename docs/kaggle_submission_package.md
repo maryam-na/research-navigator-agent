@@ -53,6 +53,8 @@ The project also includes a local MCP server wrapper in `app/mcp_server.py`. Thi
 
 ### Course Concepts Demonstrated
 
+The full criterion-by-criterion evidence map is in `docs/capstone_evaluation_mapping.md`.
+
 The project demonstrates several course concepts directly:
 
 - **Agent / ADK:** `app/agent.py` defines the Google ADK-facing agent wrapper, and `app/adk_tools.py` exposes deterministic tools for orchestration.

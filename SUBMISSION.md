@@ -97,6 +97,7 @@ uv run streamlit run ui/streamlit_app.py
 ## Key Artifacts
 
 - `README.md`: main project overview.
+- `docs/capstone_evaluation_mapping.md`: rubric-to-evidence audit for capstone judging.
 - `SKILL.md`: project skill instructions.
 - `AGENTS.md`: shared coding-agent instructions.
 - `app/agent.py`: ADK-facing prototype entry point.

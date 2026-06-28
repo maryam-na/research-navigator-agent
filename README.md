@@ -59,6 +59,7 @@ Judge-facing docs:
 - `SUBMISSION.md`
 - `docs/kaggle_submission_package.md`
 - `docs/kaggle_video_script.md`
+- `docs/capstone_evaluation_mapping.md`
 - `docs/agent_technology_story.md`
 - `docs/mcp_server.md`
 - `docs/antigravity_demo_notes.md`

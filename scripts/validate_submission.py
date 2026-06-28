@@ -15,7 +15,6 @@ from scripts.project_stats import calculate_project_stats
 from tools.config_tools import load_config
 from tools.logging_tools import log_error, log_info
 
-
 REQUIRED_FILES = [
     "README.md",
     "SUBMISSION.md",
@@ -32,6 +31,7 @@ REQUIRED_FILES = [
     "evals/golden_cases.json",
     "docs/kaggle_submission_package.md",
     "docs/kaggle_video_script.md",
+    "docs/capstone_evaluation_mapping.md",
     "docs/agent_technology_story.md",
     "docs/mcp_server.md",
     "docs/antigravity_demo_notes.md",
@@ -316,6 +316,7 @@ def _check_docs_content(root: Path) -> list[dict]:
         "Competition Demo",
         "Architecture",
         "ADK Prototype Entry Point",
+        "capstone_evaluation_mapping.md",
         "Known Limitations",
     ]
     checks = []

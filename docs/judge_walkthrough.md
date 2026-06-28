@@ -8,9 +8,11 @@ Open:
 
 ```text
 SUBMISSION.md
+docs/capstone_evaluation_mapping.md
 ```
 
-This explains the problem, solution, safety approach, and key results.
+This explains the problem, solution, safety approach, key results, and
+criterion-by-criterion evidence map.
 
 ## 2. Run The Local Demo
 
