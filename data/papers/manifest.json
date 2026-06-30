@@ -39,6 +39,15 @@
       "permission_confirmed": true
     },
     {
+      "filename": "paper-07_3.pdf",
+      "paper_id": "paper-07_3",
+      "title": "paper 07 3",
+      "source_type": "local_upload",
+      "license_notes": "User confirmed this local PDF is synthetic, sample, open-access, or otherwise permitted.",
+      "topic": "user uploaded",
+      "permission_confirmed": true
+    },
+    {
       "filename": "paper_06.pdf",
       "paper_id": "paper_06",
       "title": "paper 06",

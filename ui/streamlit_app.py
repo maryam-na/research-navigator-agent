@@ -66,11 +66,14 @@ DEFAULT_EVALUATION_PATH = Path("data/processed/evaluation_report.json")
 DEFAULT_BRIEF_PATH = Path("data/processed/researchnavigator_brief.md")
 FALLBACK_DEFAULT_SEARCH_QUERY = "limitations evaluation dataset"
 FALLBACK_MAX_SEARCH_RESULTS = 30
+SEARCH_PAGE_SIZE_OPTIONS = [6, 10, 15, 30]
 STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "dataset", "background"]
 RESULT_TYPES = ["all", "statements", "gaps", "hypotheses", "experiment_plans"]
 SELECTED_EVIDENCE_KEY = "selected_evidence_statement_id"
 SELECTED_EVIDENCE_SOURCE_KEY = "selected_evidence_source"
 EVIDENCE_SELECTBOX_KEY = "evidence_inspector_statement_selectbox"
+SEARCH_RESULTS_PAGE_KEY = "search_results_page"
+SEARCH_RESULTS_PAGE_SIZE_KEY = "search_results_page_size"
 LAST_PIPELINE_RUN_KEY = "last_local_pipeline_run"
 PIPELINE_COMMANDS = [
     "uv run python -m scripts.ingest_papers --papers-dir data/papers --db-path data/processed/papers.sqlite --extract-statements --filter-statements --max-statements-per-type-per-paper 30",
@@ -574,6 +577,43 @@ def _inject_global_styles() -> None:
             border-color: #99f6e4;
             color: #115e59;
             background: #f0fdfa;
+        }
+        .rn-tag.action {
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+        .rn-review-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 8px;
+            margin: 8px 0 12px;
+        }
+        .rn-review-strip-item {
+            border: 1px solid var(--rn-line);
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 8px 10px;
+            min-width: 0;
+        }
+        .rn-review-strip-label {
+            color: var(--rn-muted);
+            font-size: 0.7rem;
+            font-weight: 760;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .rn-review-strip-value {
+            color: var(--rn-ink);
+            font-size: 0.86rem;
+            font-weight: 700;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+        .rn-result-pager-note {
+            color: var(--rn-muted);
+            font-size: 0.82rem;
+            margin: 4px 0 8px;
         }
         .rn-chain-note {
             color: var(--rn-muted);
@@ -1353,6 +1393,39 @@ def _limit_search_results(results: list[dict], max_results: int) -> tuple[list[d
     return limited_results, f"Showing top {len(limited_results)} of {len(results)} local matches."
 
 
+def _search_page_size_options(max_results: int) -> list[int]:
+    max_results = max(1, int(max_results))
+    options = [option for option in SEARCH_PAGE_SIZE_OPTIONS if option < max_results]
+    options.append(max_results)
+    return sorted(set(options))
+
+
+def _paginate_search_results(
+    results: list[dict],
+    page: int,
+    page_size: int,
+) -> tuple[list[dict], int, int]:
+    if not results:
+        return [], 1, 1
+    page_size = max(1, int(page_size))
+    page_count = max(1, (len(results) + page_size - 1) // page_size)
+    current_page = max(1, min(int(page), page_count))
+    start = (current_page - 1) * page_size
+    return results[start : start + page_size], current_page, page_count
+
+
+def _search_page_note(
+    visible_count: int,
+    total_count: int,
+    current_page: int,
+    page_count: int,
+) -> str:
+    if total_count == 0:
+        return "No results to review."
+    page_fragment = f"page {current_page} of {page_count}" if page_count > 1 else "single page"
+    return f"Showing {visible_count} of {total_count} retained results on {page_fragment}."
+
+
 def _global_safety_threshold_message(
     evaluation: dict,
     threshold: float,
@@ -1610,6 +1683,51 @@ def _selected_evidence_source_matches(statement_id: str, source_label: str) -> b
     )
 
 
+def _selected_evidence_review_value(data: dict, statement_id: str) -> str:
+    detail = _selected_evidence_detail(data, statement_id)
+    if detail["status"] == "empty":
+        return "No evidence selected"
+    if detail["status"] == "missing":
+        return f"{detail['statement_id']} unavailable"
+    statement = detail["statement"]
+    return " | ".join(
+        item
+        for item in [
+            str(detail["statement_id"]),
+            str(statement.get("statement_type", "unknown")),
+            str(statement.get("paper_id", "unknown")),
+        ]
+        if item
+    )
+
+
+def _render_search_review_strip(
+    data: dict,
+    visible_count: int,
+    total_count: int,
+    current_page: int,
+    page_count: int,
+) -> None:
+    selected_value = _selected_evidence_review_value(
+        data,
+        str(st.session_state.get(SELECTED_EVIDENCE_KEY, "") or ""),
+    )
+    items = [
+        ("Results in view", _search_page_note(visible_count, total_count, current_page, page_count)),
+        ("Selected evidence", selected_value),
+        ("Graph focus", "Latest search results drive the graph preview"),
+    ]
+    markup = []
+    for label, value in items:
+        markup.append(
+            '<div class="rn-review-strip-item">'
+            f'<div class="rn-review-strip-label">{html.escape(label)}</div>'
+            f'<div class="rn-review-strip-value">{html.escape(value)}</div>'
+            "</div>"
+        )
+    st.markdown(f'<div class="rn-review-strip">{"".join(markup)}</div>', unsafe_allow_html=True)
+
+
 def _render_selected_evidence_handoff(data: dict, statement_id: str, source_label: str) -> bool:
     detail = _selected_evidence_detail(data, statement_id)
     if detail["status"] == "empty":
@@ -1718,8 +1836,12 @@ def _render_evidence_action(
         st.caption("Linked evidence IDs are not available in the current statement table.")
         return
     target_id = available_ids[0]
-    if st.button("Inspect evidence", key=key):
-        _select_evidence_statement(target_id, source_label)
+    if st.button(
+        "Inspect evidence",
+        key=key,
+        on_click=_select_evidence_statement,
+        args=(target_id, source_label),
+    ):
         st.success("Showing selected evidence below and in the Evidence Inspector tab.")
     if _selected_evidence_source_matches(target_id, source_label):
         _render_selected_evidence_handoff(data, target_id, source_label)
@@ -2239,6 +2361,27 @@ def _render_evidence_warning(record: dict, item_name: str) -> None:
         st.warning(f"This {item_name} does not list local statement evidence.")
 
 
+def _gap_next_action(gap: dict) -> tuple[str, str]:
+    evidence_status = str(gap.get("evidence_status", ""))
+    if evidence_status and evidence_status != "evidence-linked":
+        return "Resolve evidence links", "warn"
+    if int(gap.get("evidence_count", 0)) <= 1:
+        return "Inspect source evidence", "action"
+    if int(gap.get("paper_count", 0)) <= 1:
+        return "Check paper coverage", "action"
+    return "Compare linked hypotheses", "good"
+
+
+def _hypothesis_next_action(hypothesis: dict) -> tuple[str, str]:
+    if int(hypothesis.get("evidence_count", 0)) <= 0:
+        return "Resolve evidence links", "warn"
+    if not hypothesis.get("experiment_plan_available"):
+        return "Draft experiment plan", "warn"
+    if str(hypothesis.get("confidence_level", "")).lower() == "low":
+        return "Inspect source evidence", "action"
+    return "Review experiment plan", "good"
+
+
 def _plan_for_hypothesis(hypothesis_id: str, plans: list[dict]) -> dict | None:
     for plan in plans:
         if str(plan.get("hypothesis_id", "")) == hypothesis_id:
@@ -2316,6 +2459,7 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
         if not filtered_gaps:
             st.info("No gaps match the current triage filters. Try broadening the search or lowering thresholds.")
         for gap in filtered_gaps:
+            next_action, next_action_tone = _gap_next_action(gap)
             gap_title = discovery_label(
                 str(gap.get("gap_text", "")),
                 fallback=str(gap.get("display_label") or gap.get("gap_id") or "Research gap"),
@@ -2344,6 +2488,7 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
                         ("evidence", gap.get("evidence_count", 0), "good"),
                         ("papers", gap.get("paper_count", 0), "good"),
                         ("status", gap.get("evidence_status", ""), "warn" if gap.get("evidence_status") != "evidence-linked" else "good"),
+                        ("next", next_action, next_action_tone),
                     ]
                 )
                 st.caption(f"Score inputs: {gap.get('rank_score_explanation')}")
@@ -2418,6 +2563,7 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
     if not filtered_hypotheses:
         st.info("No hypotheses match the current triage filters. Try broadening the search or lowering thresholds.")
     for hypothesis in filtered_hypotheses:
+        next_action, next_action_tone = _hypothesis_next_action(hypothesis)
         hypothesis_id = str(hypothesis.get("hypothesis_id", ""))
         hypothesis_title = discovery_label(
             str(hypothesis.get("hypothesis_text", "")),
@@ -2455,6 +2601,7 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
                         "available" if hypothesis.get("experiment_plan_available") else "missing",
                         "good" if hypothesis.get("experiment_plan_available") else "warn",
                     ),
+                    ("next", next_action, next_action_tone),
                 ]
             )
             st.caption(
@@ -2610,6 +2757,15 @@ def _graph_available_node_types(graph: nx.DiGraph) -> list[str]:
     )
 
 
+def _graph_available_relation_types(graph: nx.DiGraph) -> list[str]:
+    return sorted(
+        {
+            str(attrs.get("relation", "related") or "related")
+            for _source, _target, attrs in graph.edges(data=True)
+        }
+    )
+
+
 def _graph_node_type_label(node_type: str) -> str:
     return str(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("label") or node_type.replace("_", " ").title())
 
@@ -2628,6 +2784,20 @@ def _filter_graph_by_node_types(graph: nx.DiGraph, node_types: list[str]) -> nx.
         if _graph_node_type(attrs) in selected_types
     ]
     return graph.subgraph(selected_nodes).copy()
+
+
+def _filter_graph_by_relation_types(graph: nx.DiGraph, relation_types: list[str]) -> nx.DiGraph:
+    selected_relations = set(relation_types)
+    filtered = nx.DiGraph()
+    filtered.add_nodes_from(graph.nodes(data=True))
+    if not selected_relations:
+        return filtered
+    filtered.add_edges_from(
+        (source, target, attrs)
+        for source, target, attrs in graph.edges(data=True)
+        if str(attrs.get("relation", "related") or "related") in selected_relations
+    )
+    return filtered
 
 
 def _clip_graph_label(value: object, max_chars: int = 42) -> str:
@@ -2979,6 +3149,7 @@ def _render_search_workspace(
         st.session_state["last_search_query"] = query
         st.session_state["last_search_results"] = results
         st.session_state["last_search_limit_message"] = limit_message
+        st.session_state[SEARCH_RESULTS_PAGE_KEY] = 1
 
     active_query = st.session_state.get("last_search_query", "")
     results = st.session_state.get("last_search_results", [])
@@ -2989,7 +3160,47 @@ def _render_search_workspace(
             st.caption(limit_message)
         if not results:
             st.info("No local matches found. Try a broader keyword or run the processing pipeline.")
-        for result_index, result in enumerate(results):
+            return
+
+        page_size_options = _search_page_size_options(min(max_search_results, len(results)))
+        if st.session_state.get(SEARCH_RESULTS_PAGE_SIZE_KEY) not in page_size_options:
+            st.session_state[SEARCH_RESULTS_PAGE_SIZE_KEY] = page_size_options[0]
+        pager_cols = st.columns([1, 1, 2])
+        page_size = pager_cols[0].selectbox(
+            "Results per page",
+            page_size_options,
+            index=0,
+            key=SEARCH_RESULTS_PAGE_SIZE_KEY,
+        )
+        _visible_results, current_page, page_count = _paginate_search_results(
+            results,
+            int(st.session_state.get(SEARCH_RESULTS_PAGE_KEY, 1)),
+            int(page_size),
+        )
+        if st.session_state.get(SEARCH_RESULTS_PAGE_KEY) != current_page:
+            st.session_state[SEARCH_RESULTS_PAGE_KEY] = current_page
+        if page_count > 1:
+            current_page = pager_cols[1].selectbox(
+                "Result page",
+                list(range(1, page_count + 1)),
+                index=current_page - 1,
+                key=SEARCH_RESULTS_PAGE_KEY,
+                format_func=lambda page: f"Page {page} of {page_count}",
+            )
+        else:
+            pager_cols[1].markdown("&nbsp;", unsafe_allow_html=True)
+        visible_results, current_page, page_count = _paginate_search_results(
+            results,
+            int(current_page),
+            int(page_size),
+        )
+        st.markdown(
+            f'<div class="rn-result-pager-note">{html.escape(_search_page_note(len(visible_results), len(results), current_page, page_count))}</div>',
+            unsafe_allow_html=True,
+        )
+        _render_search_review_strip(data, len(visible_results), len(results), current_page, page_count)
+        start_index = (current_page - 1) * int(page_size)
+        for result_index, result in enumerate(visible_results, start=start_index):
             _result_card(result, data, result_index)
     else:
         st.markdown(
@@ -3150,7 +3361,7 @@ def main() -> None:
         )
         _render_artifact_guidance(artifact_readiness, "graph")
         available_node_types = _graph_available_node_types(subgraph)
-        control_cols = st.columns([2, 1])
+        control_cols = st.columns([2, 2, 1])
         selected_node_types = control_cols[0].multiselect(
             "Node types",
             available_node_types,
@@ -3158,8 +3369,17 @@ def main() -> None:
             format_func=_graph_node_type_label,
             help="Filters the visible preview only; raw graph artifacts remain unchanged.",
         )
-        label_mode = control_cols[1].selectbox("Labels", GRAPH_LABEL_MODES)
-        filtered_subgraph = _filter_graph_by_node_types(subgraph, selected_node_types)
+        node_filtered_subgraph = _filter_graph_by_node_types(subgraph, selected_node_types)
+        available_relation_types = _graph_available_relation_types(node_filtered_subgraph)
+        selected_relation_types = control_cols[1].multiselect(
+            "Relations",
+            available_relation_types,
+            default=available_relation_types,
+            format_func=lambda relation: str(relation).replace("_", " ").title(),
+            help="Filters visible edges while keeping the selected nodes in view.",
+        )
+        label_mode = control_cols[2].selectbox("Labels", GRAPH_LABEL_MODES)
+        filtered_subgraph = _filter_graph_by_relation_types(node_filtered_subgraph, selected_relation_types)
         _render_graph_summary(filtered_subgraph, graph_source_note)
         _render_graph_legend(filtered_subgraph)
         with st.expander("Graph summary data", expanded=False):

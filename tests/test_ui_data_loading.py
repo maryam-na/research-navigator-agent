@@ -15,16 +15,21 @@ from ui.streamlit_app import (
     _evidence_statement_ids_for_result,
     _filter_gap_triage,
     _filter_graph_by_node_types,
+    _filter_graph_by_relation_types,
     _filter_hypothesis_triage,
+    _gap_next_action,
     _global_safety_threshold_message,
     _graph_available_node_types,
+    _graph_available_relation_types,
     _graph_display_label,
     _graph_hover_text,
     _graph_label_node_ids,
     _graph_node_text_label,
     _graph_node_type_label,
+    _hypothesis_next_action,
     _limit_search_results,
     _load_ui_settings,
+    _paginate_search_results,
     _render_dataframe,
     _render_plotly_chart,
     _render_selected_evidence_handoff,
@@ -32,6 +37,8 @@ from ui.streamlit_app import (
     _result_card_preview,
     _result_card_title,
     _result_metadata_tags,
+    _search_page_note,
+    _search_page_size_options,
     _selected_evidence_detail,
     _sort_gap_triage,
     _sort_hypothesis_triage,
@@ -240,6 +247,24 @@ def test_graph_type_filter_preserves_only_selected_visible_node_types():
     assert _graph_available_node_types(graph) == ["paper", "statement", "method", "result"]
     assert sorted(filtered.nodes()) == ["method:stmt_method", "result:stmt_result"]
     assert list(filtered.edges()) == [("method:stmt_method", "result:stmt_result")]
+
+
+def test_graph_relation_filter_preserves_nodes_while_filtering_edges():
+    graph = nx.DiGraph()
+    graph.add_node("method:stmt_method", node_type="method")
+    graph.add_node("result:stmt_result", node_type="result")
+    graph.add_node("limitation:stmt_limitation", node_type="limitation")
+    graph.add_edge("method:stmt_method", "result:stmt_result", relation="supports")
+    graph.add_edge("result:stmt_result", "limitation:stmt_limitation", relation="limited_by")
+
+    filtered = _filter_graph_by_relation_types(graph, ["limited_by"])
+    nodes_only = _filter_graph_by_relation_types(graph, [])
+
+    assert _graph_available_relation_types(graph) == ["limited_by", "supports"]
+    assert sorted(filtered.nodes()) == sorted(graph.nodes())
+    assert list(filtered.edges()) == [("result:stmt_result", "limitation:stmt_limitation")]
+    assert sorted(nodes_only.nodes()) == sorted(graph.nodes())
+    assert list(nodes_only.edges()) == []
 
 
 def test_static_graph_svg_fallback_renders_readable_nonblank_preview(monkeypatch):
@@ -588,6 +613,23 @@ def test_search_result_limit_returns_configured_window_and_message():
     assert message == "Showing top 3 of 5 local matches."
 
 
+def test_search_pagination_keeps_result_review_window_short():
+    results = [{"result_id": f"result_{index}"} for index in range(14)]
+
+    page_one, current_page, page_count = _paginate_search_results(results, page=1, page_size=6)
+    page_three, normalized_page, normalized_count = _paginate_search_results(results, page=99, page_size=6)
+
+    assert _search_page_size_options(30) == [6, 10, 15, 30]
+    assert _search_page_size_options(7) == [6, 7]
+    assert [result["result_id"] for result in page_one] == [f"result_{index}" for index in range(6)]
+    assert current_page == 1
+    assert page_count == 3
+    assert [result["result_id"] for result in page_three] == ["result_12", "result_13"]
+    assert normalized_page == 3
+    assert normalized_count == 3
+    assert _search_page_note(2, 14, 3, 3) == "Showing 2 of 14 retained results on page 3 of 3."
+
+
 def test_global_safety_threshold_message_describes_warning_without_filtering():
     assert _global_safety_threshold_message({"safety_score": 0.8}, 0.7) is None
     assert _global_safety_threshold_message({}, 0.0) is None
@@ -865,6 +907,8 @@ def test_discovery_gap_triage_filters_and_sorts():
 
     assert [gap["gap_id"] for gap in filtered] == ["gap_b"]
     assert [gap["gap_id"] for gap in _sort_gap_triage(gaps, "Paper coverage")] == ["gap_b", "gap_a"]
+    assert _gap_next_action(gaps[0]) == ("Inspect source evidence", "action")
+    assert _gap_next_action(gaps[1]) == ("Resolve evidence links", "warn")
 
 
 def test_discovery_hypothesis_triage_filters_and_sorts():
@@ -915,3 +959,5 @@ def test_discovery_hypothesis_triage_filters_and_sorts():
         "hyp_b",
         "hyp_a",
     ]
+    assert _hypothesis_next_action(hypotheses[0]) == ("Draft experiment plan", "warn")
+    assert _hypothesis_next_action(hypotheses[1]) == ("Review experiment plan", "good")

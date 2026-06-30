@@ -1,3 +1,47 @@
+# Operating system and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python caches and local test/lint state
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Local logs and scratch files
+*.log
+logs/
+tmp/
+.cache/
+
+# Local paper corpus uploads are private workspace data.
+data/papers/*
+!data/papers/
+!data/papers/.gitkeep
+
+# Generated pipeline outputs should be rebuilt locally, not pushed.
+data/processed/*
+!data/processed/
+!data/processed/.gitkeep
+
 # Local ticket instances are private workspace state.
 tickets/*
 !tickets/
