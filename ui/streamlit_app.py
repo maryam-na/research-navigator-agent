@@ -687,6 +687,21 @@ def _artifact_readiness_summary(readiness: dict[str, object]) -> str:
     return " | ".join(parts)
 
 
+def _artifact_readiness_display_summary(readiness: dict[str, object]) -> str:
+    status = str(readiness.get("status", "partial"))
+    if status == "ready":
+        return str(readiness.get("summary", "All expected local generated artifacts are present and current enough."))
+    if status == "missing":
+        return (
+            "Processed files are missing. Use Pipeline Trace to run local recovery commands "
+            "or rebuild the pipeline."
+        )
+    return (
+        "Some generated files are missing or older than their inputs. "
+        "Recovery commands are consolidated in Pipeline Trace."
+    )
+
+
 def _render_artifact_readiness(
     readiness: dict[str, object],
     *,
@@ -695,7 +710,7 @@ def _render_artifact_readiness(
     status = str(readiness.get("status", "partial"))
     banner_class = _artifact_banner_class(status)
     headline = html.escape(str(readiness.get("headline", "Artifact readiness")))
-    summary = html.escape(str(readiness.get("summary", "")))
+    summary = html.escape(_artifact_readiness_display_summary(readiness))
     artifact_summary = html.escape(_artifact_readiness_summary(readiness))
     st.markdown(
         f"""
@@ -725,7 +740,6 @@ def _render_artifact_readiness_details(readiness: dict[str, object]) -> None:
             ],
             columns=4,
         )
-        _render_recovery_steps(problem_artifacts)
         _render_artifact_status_table(readiness)
     else:
         if artifacts:
@@ -733,36 +747,71 @@ def _render_artifact_readiness_details(readiness: dict[str, object]) -> None:
         _render_artifact_status_table(readiness)
 
 
+def _artifact_guidance_message(artifact: dict) -> dict[str, str]:
+    status = str(artifact.get("status", "not ready"))
+    label = str(artifact.get("label", "Artifact"))
+    reason = str(artifact.get("reason", "")).strip()
+    if status == "missing":
+        tone = "fail"
+    elif status == "ready":
+        tone = "good"
+    else:
+        tone = "warn"
+    return {
+        "tone": tone,
+        "title": f"{label} is {status}",
+        "body": (
+            f"{reason} Recovery commands are consolidated in Pipeline Trace."
+            if reason
+            else "Recovery commands are consolidated in Pipeline Trace."
+        ),
+    }
+
+
 def _render_artifact_guidance(readiness: dict[str, object], artifact_key: str) -> None:
     artifact = _artifact_by_key(readiness, artifact_key)
     if not artifact or artifact.get("status") == "ready":
         return
-    banner_class = "fail" if artifact.get("status") == "missing" else "warn"
-    artifact_label = html.escape(str(artifact.get("label", "Artifact")))
-    artifact_status = html.escape(str(artifact.get("status", "not ready")))
-    artifact_reason = html.escape(str(artifact.get("reason", "")))
+    message = _artifact_guidance_message(artifact)
     st.markdown(
         f"""
-        <div class="rn-review-banner {banner_class}">
-          <div class="rn-review-title">{artifact_label} is {artifact_status}</div>
-          <div class="rn-review-text">{artifact_reason}</div>
+        <div class="rn-review-banner {html.escape(message["tone"])}">
+          <div class="rn-review-title">{html.escape(message["title"])}</div>
+          <div class="rn-review-text">{html.escape(message["body"])}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    _render_recovery_steps([artifact])
 
 
-def _render_recovery_steps(artifacts: list[dict]) -> None:
+def _artifact_recovery_steps(artifacts: list[dict]) -> list[str]:
     steps = []
     for artifact in artifacts:
         step = str(artifact.get("recovery_step", "")).strip()
         if step and step not in steps:
             steps.append(step)
+    return steps
+
+
+def _render_recovery_steps(artifacts: list[dict], heading: str | None = "#### Recovery commands") -> None:
+    steps = _artifact_recovery_steps(artifacts)
     if not steps:
         return
-    st.markdown("#### Recovery commands")
+    if heading:
+        st.markdown(heading)
     st.code("\n".join(steps), language="bash")
+
+
+def _render_artifact_recovery_panel(readiness: dict[str, object]) -> None:
+    problem_artifacts = list(readiness.get("problem_artifacts", []) or [])
+    if not problem_artifacts:
+        st.caption("No artifact recovery commands are needed for the current files.")
+        return
+    with st.expander("Artifact recovery commands", expanded=True):
+        st.caption(
+            "Run these local commands from the repository root, or use the Run local pipeline button below."
+        )
+        _render_recovery_steps(problem_artifacts, heading=None)
 
 
 def _render_artifact_status_table(readiness: dict[str, object]) -> None:
@@ -2784,6 +2833,7 @@ def main() -> None:
         )
         st.markdown("### Generated files")
         _render_artifact_status_table(artifact_readiness)
+        _render_artifact_recovery_panel(artifact_readiness)
         with st.expander("Raw file presence"):
             _render_dataframe(
                 file_presence(
@@ -2797,8 +2847,8 @@ def main() -> None:
                 )
             )
         _render_pipeline_run_control("pipeline")
-        st.markdown("### Commands")
-        st.code("\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND]), language="bash")
+        with st.expander("Full local command reference", expanded=False):
+            st.code("\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND]), language="bash")
         with st.expander("Raw backend tables"):
             _render_dataframe(data["papers"])
             _render_dataframe(data["statements"])

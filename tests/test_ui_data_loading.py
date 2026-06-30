@@ -6,7 +6,10 @@ import networkx as nx
 from tools.graph_tools import export_graphml
 from tools.storage_tools import initialize_database, save_chunk, save_paper, save_statement
 from ui.streamlit_app import (
+    _artifact_guidance_message,
+    _artifact_readiness_display_summary,
     _artifact_readiness_summary,
+    _artifact_recovery_steps,
     _available_statement_ids,
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
@@ -307,6 +310,56 @@ def test_artifact_readiness_summary_keeps_top_status_compact():
         )
         == "2/5 ready | 1 missing | 2 stale"
     )
+
+
+def test_artifact_readiness_display_summary_points_to_pipeline_trace():
+    summary = _artifact_readiness_display_summary(
+        {
+            "status": "partial",
+            "summary": "Some generated files are missing or older than their inputs; rerun the listed local commands.",
+        }
+    )
+
+    assert summary == (
+        "Some generated files are missing or older than their inputs. "
+        "Recovery commands are consolidated in Pipeline Trace."
+    )
+    assert "listed local commands" not in summary
+
+
+def test_artifact_guidance_message_points_to_pipeline_trace_without_commands():
+    message = _artifact_guidance_message(
+        {
+            "label": "Knowledge graph",
+            "status": "stale",
+            "reason": "Artifact is older than input artifact: SQLite database.",
+            "recovery_step": "uv run python -m scripts.build_graph",
+        }
+    )
+
+    assert message == {
+        "tone": "warn",
+        "title": "Knowledge graph is stale",
+        "body": (
+            "Artifact is older than input artifact: SQLite database. "
+            "Recovery commands are consolidated in Pipeline Trace."
+        ),
+    }
+    assert "uv run" not in message["body"]
+
+
+def test_artifact_recovery_steps_deduplicates_problem_commands():
+    artifacts = [
+        {"label": "Graph", "recovery_step": "uv run python -m scripts.build_graph"},
+        {"label": "Graph copy", "recovery_step": "uv run python -m scripts.build_graph"},
+        {"label": "Evaluation", "recovery_step": "uv run python -m scripts.evaluate_outputs"},
+        {"label": "No command", "recovery_step": ""},
+    ]
+
+    assert _artifact_recovery_steps(artifacts) == [
+        "uv run python -m scripts.build_graph",
+        "uv run python -m scripts.evaluate_outputs",
+    ]
 
 
 def test_evaluation_status_distinguishes_caveats_from_pass():
