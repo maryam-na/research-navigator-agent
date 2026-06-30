@@ -14,12 +14,20 @@ from ui.streamlit_app import (
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
     _filter_gap_triage,
+    _filter_graph_by_node_types,
     _filter_hypothesis_triage,
     _global_safety_threshold_message,
+    _graph_available_node_types,
+    _graph_display_label,
+    _graph_hover_text,
+    _graph_label_node_ids,
+    _graph_node_text_label,
+    _graph_node_type_label,
     _limit_search_results,
     _load_ui_settings,
     _render_dataframe,
     _render_plotly_chart,
+    _render_static_graph_svg,
     _result_card_preview,
     _result_card_title,
     _result_metadata_tags,
@@ -150,6 +158,113 @@ def test_search_linked_subgraph_preserves_incident_edges():
     assert subgraph.number_of_edges() == 2
     assert ("paper:paper_001", "statement:stmt_limitation") in subgraph.edges
     assert ("result:stmt_result", "limitation:stmt_limitation") in subgraph.edges
+
+
+def test_graph_display_labels_prefer_research_text_over_ids():
+    paper_label = _graph_display_label(
+        "paper:paper_001",
+        {"node_type": "paper", "paper_id": "paper_001", "title": "Synthetic Evidence Paper"},
+    )
+    limitation_label = _graph_display_label(
+        "limitation:stmt_001",
+        {
+            "node_type": "limitation",
+            "statement_id": "stmt_001",
+            "statement_text": "A limitation is that evaluation uses only synthetic data.",
+        },
+    )
+    hypothesis_label = _graph_display_label(
+        "hypothesis:hyp_001",
+        {
+            "node_type": "hypothesis",
+            "hypothesis_text": "A testable hypothesis could be that controlled evaluation clarifies the gap.",
+        },
+    )
+
+    assert paper_label == "Synthetic Evidence Paper"
+    assert limitation_label == "A limitation is that evaluation uses..."
+    assert hypothesis_label == "Controlled evaluation clarifies the gap."
+    assert "stmt_001" not in limitation_label
+    assert _graph_node_type_label("future_work") == "Future Work"
+
+
+def test_graph_key_label_mode_hides_statement_evidence_ids_but_hover_keeps_audit_id():
+    attrs = {
+        "node_type": "statement",
+        "statement_id": "stmt_001",
+        "paper_id": "paper_001",
+        "statement_type": "limitation",
+        "statement_text": "A limitation is narrow evaluation.",
+    }
+
+    assert _graph_node_text_label("statement:stmt_001", attrs, "Key labels") == ""
+    assert _graph_node_text_label("statement:stmt_001", attrs, "All labels") == "A limitation is narrow evaluation."
+    hover = _graph_hover_text("statement:stmt_001", attrs)
+    assert "ID: statement:stmt_001" in hover
+    assert "Evidence ID: stmt_001" in hover
+
+
+def test_graph_key_label_mode_uses_deterministic_label_budget():
+    graph = nx.DiGraph()
+    graph.add_node("paper:paper_001", node_type="paper", paper_id="paper_001")
+    for index in range(20):
+        graph.add_node(
+            f"method:stmt_{index:02d}",
+            node_type="method",
+            statement_id=f"stmt_{index:02d}",
+            statement_text=f"Method statement {index}",
+        )
+
+    key_labels = _graph_label_node_ids(graph, "Key labels", max_key_labels=5)
+
+    assert len(key_labels) == 5
+    assert "paper:paper_001" in key_labels
+    assert "method:stmt_00" in key_labels
+    assert len(_graph_label_node_ids(graph, "All labels", max_key_labels=5)) == 21
+    assert _graph_label_node_ids(graph, "No labels", max_key_labels=5) == set()
+
+
+def test_graph_type_filter_preserves_only_selected_visible_node_types():
+    graph = nx.DiGraph()
+    graph.add_node("paper:paper_001", node_type="paper", paper_id="paper_001")
+    graph.add_node("method:stmt_method", node_type="method", statement_id="stmt_method")
+    graph.add_node("statement:stmt_method", node_type="statement", statement_id="stmt_method")
+    graph.add_node("result:stmt_result", node_type="result", statement_id="stmt_result")
+    graph.add_edge("paper:paper_001", "statement:stmt_method", relation="contains")
+    graph.add_edge("method:stmt_method", "result:stmt_result", relation="supports")
+
+    filtered = _filter_graph_by_node_types(graph, ["method", "result"])
+
+    assert _graph_available_node_types(graph) == ["paper", "statement", "method", "result"]
+    assert sorted(filtered.nodes()) == ["method:stmt_method", "result:stmt_result"]
+    assert list(filtered.edges()) == [("method:stmt_method", "result:stmt_result")]
+
+
+def test_static_graph_svg_fallback_renders_readable_nonblank_preview(monkeypatch):
+    graph = nx.DiGraph()
+    graph.add_node("paper:paper_001", node_type="paper", paper_id="paper_001", title="Synthetic Paper")
+    graph.add_node(
+        "method:stmt_method",
+        node_type="method",
+        statement_id="stmt_method",
+        statement_text="We propose a deterministic graph view.",
+    )
+    graph.add_edge("paper:paper_001", "method:stmt_method", relation="contains")
+    calls = []
+
+    def fake_markdown(value, **kwargs):
+        calls.append((value, kwargs))
+
+    monkeypatch.setattr("ui.streamlit_app.st.markdown", fake_markdown)
+
+    _render_static_graph_svg(graph)
+
+    assert calls
+    svg_markup = calls[0][0]
+    assert '<svg class="rn-static-graph"' in svg_markup
+    assert "Synthetic Paper" in svg_markup
+    assert "We propose a deterministic graph" in svg_markup
+    assert calls[0][1] == {"unsafe_allow_html": True}
 
 
 def test_dashboard_counts_and_file_presence(tmp_path):

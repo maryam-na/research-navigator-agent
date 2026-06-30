@@ -118,6 +118,89 @@ ARTIFACT_SPECS = [
         "recovery_step": BRIEF_ARTIFACT_COMMAND,
     },
 ]
+GRAPH_NODE_TYPE_STYLES = {
+    "paper": {
+        "label": "Paper",
+        "color": "#1d4ed8",
+        "description": "Local paper source",
+        "default_label": True,
+        "size": 15,
+    },
+    "statement": {
+        "label": "Evidence",
+        "color": "#94a3b8",
+        "description": "Extracted statement provenance",
+        "default_label": False,
+        "size": 6,
+    },
+    "method": {
+        "label": "Method",
+        "color": "#0f766e",
+        "description": "Method statement",
+        "default_label": True,
+        "size": 11,
+    },
+    "result": {
+        "label": "Result",
+        "color": "#7c3aed",
+        "description": "Result statement",
+        "default_label": True,
+        "size": 11,
+    },
+    "limitation": {
+        "label": "Limitation",
+        "color": "#b91c1c",
+        "description": "Limitation evidence",
+        "default_label": True,
+        "size": 11,
+    },
+    "future_work": {
+        "label": "Future Work",
+        "color": "#b45309",
+        "description": "Future-work evidence",
+        "default_label": True,
+        "size": 11,
+    },
+    "dataset": {
+        "label": "Dataset",
+        "color": "#0369a1",
+        "description": "Dataset evidence",
+        "default_label": True,
+        "size": 11,
+    },
+    "background": {
+        "label": "Background",
+        "color": "#475569",
+        "description": "Background context",
+        "default_label": False,
+        "size": 9,
+    },
+    "unknown": {
+        "label": "Unknown",
+        "color": "#334155",
+        "description": "Unclassified node",
+        "default_label": False,
+        "size": 9,
+    },
+    "gap": {
+        "label": "Gap",
+        "color": "#be123c",
+        "description": "Generated research gap",
+        "default_label": True,
+        "size": 12,
+    },
+    "hypothesis": {
+        "label": "Hypothesis",
+        "color": "#9333ea",
+        "description": "Speculative hypothesis",
+        "default_label": True,
+        "size": 12,
+    },
+}
+GRAPH_NODE_TYPE_ORDER = {
+    node_type: index for index, node_type in enumerate(GRAPH_NODE_TYPE_STYLES)
+}
+GRAPH_LABEL_MODES = ["Key labels", "All labels", "No labels"]
 
 
 def _inject_global_styles() -> None:
@@ -513,6 +596,31 @@ def _inject_global_styles() -> None:
             font-size: 0.78rem;
             margin-bottom: 5px;
         }
+        .rn-graph-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0 10px;
+        }
+        .rn-graph-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--rn-line);
+            border-radius: 999px;
+            background: #ffffff;
+            color: #334155;
+            padding: 4px 8px;
+            font-size: 0.74rem;
+            font-weight: 650;
+            max-width: 100%;
+        }
+        .rn-graph-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            flex: 0 0 auto;
+        }
         div[data-testid="stTabs"] div[role="tablist"] {
             gap: 4px;
             flex-wrap: wrap;
@@ -586,6 +694,10 @@ def _inject_global_styles() -> None:
                 display: none;
             }
             .rn-tag {
+                font-size: 0.68rem;
+                padding: 3px 6px;
+            }
+            .rn-graph-legend-item {
                 font-size: 0.68rem;
                 padding: 3px 6px;
             }
@@ -2297,7 +2409,188 @@ def _graph_node_sort_key(graph: nx.DiGraph, node_id: str) -> tuple[str, str, str
     )
 
 
-def _render_graph(graph: nx.DiGraph) -> None:
+def _graph_node_type(node_attrs: dict) -> str:
+    return str(node_attrs.get("node_type", "unknown") or "unknown")
+
+
+def _graph_node_type_sort_key(node_type: str) -> tuple[int, str]:
+    return (GRAPH_NODE_TYPE_ORDER.get(node_type, 99), node_type)
+
+
+def _graph_available_node_types(graph: nx.DiGraph) -> list[str]:
+    return sorted(
+        {_graph_node_type(attrs) for _node_id, attrs in graph.nodes(data=True)},
+        key=_graph_node_type_sort_key,
+    )
+
+
+def _graph_node_type_label(node_type: str) -> str:
+    return str(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("label") or node_type.replace("_", " ").title())
+
+
+def _graph_node_type_description(node_type: str) -> str:
+    return str(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("description") or "Graph node")
+
+
+def _filter_graph_by_node_types(graph: nx.DiGraph, node_types: list[str]) -> nx.DiGraph:
+    selected_types = set(node_types)
+    if not selected_types:
+        return nx.DiGraph()
+    selected_nodes = [
+        node_id
+        for node_id, attrs in graph.nodes(data=True)
+        if _graph_node_type(attrs) in selected_types
+    ]
+    return graph.subgraph(selected_nodes).copy()
+
+
+def _clip_graph_label(value: object, max_chars: int = 42) -> str:
+    text = _normalize_card_text(value)
+    if len(text) <= max_chars:
+        return text
+    clipped = text[: max_chars - 3].rstrip()
+    if " " in clipped:
+        clipped = clipped.rsplit(" ", 1)[0].rstrip()
+    return f"{clipped}..."
+
+
+def _graph_display_label(node_id: str, attrs: dict, max_chars: int = 42) -> str:
+    node_type = _graph_node_type(attrs)
+    if node_type == "paper":
+        label = attrs.get("title") or attrs.get("paper_title") or attrs.get("paper_id") or node_id.split(":", 1)[-1]
+    elif node_type == "gap":
+        label = humanize_discovery_text(str(attrs.get("gap_text") or attrs.get("label") or ""), fallback="Research gap")
+    elif node_type == "hypothesis":
+        label = humanize_discovery_text(
+            str(attrs.get("hypothesis_text") or attrs.get("label") or ""),
+            fallback="Speculative hypothesis",
+        )
+    elif node_type == "statement":
+        label = attrs.get("statement_text") or attrs.get("evidence_text") or "Evidence statement"
+    else:
+        label = attrs.get("statement_text") or attrs.get("evidence_text") or attrs.get("label") or node_id.split(":", 1)[-1]
+    return _clip_graph_label(label, max_chars)
+
+
+def _graph_should_show_label(node_type: str, label_mode: str) -> bool:
+    if label_mode == "All labels":
+        return True
+    if label_mode == "No labels":
+        return False
+    return bool(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("default_label", False))
+
+
+def _graph_label_sort_key(graph: nx.DiGraph, node_id: str) -> tuple[int, str, str]:
+    attrs = dict(graph.nodes[node_id])
+    node_type = _graph_node_type(attrs)
+    priority = {
+        "paper": 0,
+        "gap": 1,
+        "hypothesis": 2,
+        "limitation": 3,
+        "result": 4,
+        "future_work": 5,
+        "method": 6,
+        "dataset": 7,
+    }.get(node_type, 9)
+    return (priority, str(attrs.get("paper_id", "")), str(node_id))
+
+
+def _graph_label_node_ids(graph: nx.DiGraph, label_mode: str, max_key_labels: int = 14) -> set[str]:
+    if label_mode == "All labels":
+        return {str(node_id) for node_id in graph.nodes()}
+    if label_mode == "No labels":
+        return set()
+    candidates = [
+        str(node_id)
+        for node_id, attrs in graph.nodes(data=True)
+        if _graph_should_show_label(_graph_node_type(attrs), label_mode)
+    ]
+    return set(sorted(candidates, key=lambda node_id: _graph_label_sort_key(graph, node_id))[:max_key_labels])
+
+
+def _graph_node_text_label(
+    node_id: str,
+    attrs: dict,
+    label_mode: str,
+    labeled_node_ids: set[str] | None = None,
+) -> str:
+    node_type = _graph_node_type(attrs)
+    if not _graph_should_show_label(node_type, label_mode):
+        return ""
+    if labeled_node_ids is not None and str(node_id) not in labeled_node_ids:
+        return ""
+    return _graph_display_label(node_id, attrs, max_chars=34)
+
+
+def _graph_hover_text(node_id: str, attrs: dict) -> str:
+    node_type = _graph_node_type(attrs)
+    parts = [
+        f"<b>{html.escape(_graph_display_label(node_id, attrs, max_chars=120))}</b>",
+        f"Type: {html.escape(_graph_node_type_label(node_type))}",
+        f"ID: {html.escape(str(node_id))}",
+    ]
+    if attrs.get("paper_id"):
+        parts.append(f"Paper: {html.escape(str(attrs.get('paper_id')))}")
+    if attrs.get("statement_id"):
+        parts.append(f"Evidence ID: {html.escape(str(attrs.get('statement_id')))}")
+    if attrs.get("statement_type") and node_type == "statement":
+        parts.append(f"Statement type: {html.escape(str(attrs.get('statement_type')))}")
+    return "<br>".join(parts)
+
+
+def _graph_node_color(node_type: str) -> str:
+    return str(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("color", "#334155"))
+
+
+def _graph_node_size(node_type: str) -> int:
+    return int(GRAPH_NODE_TYPE_STYLES.get(node_type, {}).get("size", 9))
+
+
+def _graph_relation_summary(graph: nx.DiGraph) -> str:
+    summary = graph_summary(graph)
+    relation_types = summary.get("relation_types", {})
+    if not relation_types:
+        return "No visible relationships"
+    return " | ".join(f"{relation}: {count}" for relation, count in relation_types.items())
+
+
+def _render_graph_summary(graph: nx.DiGraph, source_note: str) -> None:
+    summary = graph_summary(graph)
+    _metric_cards(
+        [
+            ("Visible nodes", summary["nodes"]),
+            ("Visible edges", summary["edges"]),
+            ("Node types", len(summary["node_types"])),
+            ("Relation types", len(summary["relation_types"])),
+        ],
+        columns=4,
+    )
+    st.caption(f"{source_note} Relationships: {_graph_relation_summary(graph)}.")
+
+
+def _render_graph_legend(graph: nx.DiGraph) -> None:
+    type_counts = graph_summary(graph).get("node_types", {})
+    if not type_counts:
+        return
+    legend_items = []
+    for node_type in sorted(type_counts, key=_graph_node_type_sort_key):
+        label = _graph_node_type_label(node_type)
+        count = type_counts[node_type]
+        description = _graph_node_type_description(node_type)
+        color = _graph_node_color(node_type)
+        legend_items.append(
+            '<span class="rn-graph-legend-item" title="'
+            + html.escape(description)
+            + '">'
+            + f'<span class="rn-graph-dot" style="background:{html.escape(color)}"></span>'
+            + html.escape(f"{label}: {count}")
+            + "</span>"
+        )
+    st.markdown(f'<div class="rn-graph-legend">{"".join(legend_items)}</div>', unsafe_allow_html=True)
+
+
+def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
     nodes_df, edges_df = graph_to_tables(graph)
     if graph.number_of_nodes() == 0:
         st.info("No graph data available yet.")
@@ -2319,28 +2612,58 @@ def _render_graph(graph: nx.DiGraph) -> None:
             edge_x.extend([x0, x1, None])
             edge_y.extend([y0, y1, None])
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines", line={"width": 1, "color": "#9ca3af"}))
+        labeled_node_ids = _graph_label_node_ids(graph, label_mode)
         fig.add_trace(
             go.Scatter(
-                x=[positions[node][0] for node in graph.nodes()],
-                y=[positions[node][1] for node in graph.nodes()],
-                mode="markers",
-                marker={"size": 9, "color": "#2563eb"},
-                text=[str(node) for node in graph.nodes()],
-                hoverinfo="text",
+                x=edge_x,
+                y=edge_y,
+                mode="lines",
+                line={"width": 1, "color": "#94a3b8"},
+                hoverinfo="skip",
             )
         )
+        for node_type in _graph_available_node_types(graph):
+            nodes = [
+                node_id
+                for node_id, attrs in sorted(graph.nodes(data=True), key=lambda item: str(item[0]))
+                if _graph_node_type(attrs) == node_type
+            ]
+            text_labels = [
+                _graph_node_text_label(str(node_id), dict(graph.nodes[node_id]), label_mode, labeled_node_ids)
+                for node_id in nodes
+            ]
+            mode = "markers+text" if any(text_labels) else "markers"
+            fig.add_trace(
+                go.Scatter(
+                    x=[positions[node][0] for node in nodes],
+                    y=[positions[node][1] for node in nodes],
+                    mode=mode,
+                    marker={
+                        "size": _graph_node_size(node_type),
+                        "color": _graph_node_color(node_type),
+                        "line": {"width": 0.8, "color": "#ffffff"},
+                    },
+                    text=text_labels,
+                    textposition="top center",
+                    textfont={"size": 10, "color": "#111827"},
+                    hovertext=[_graph_hover_text(str(node), dict(graph.nodes[node])) for node in nodes],
+                    hoverinfo="text",
+                    name=_graph_node_type_label(node_type),
+                )
+            )
         fig.update_layout(showlegend=False, margin={"l": 0, "r": 0, "t": 10, "b": 0}, height=520)
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
         _render_plotly_chart(fig)
     except Exception:
         st.info("Interactive graph rendering is unavailable. Showing a local static preview.")
-        _render_static_graph_svg(graph)
+        _render_static_graph_svg(graph, label_mode=label_mode)
     with st.expander("Node and edge tables"):
         _render_dataframe(nodes_df)
         _render_dataframe(edges_df)
 
 
-def _render_static_graph_svg(graph: nx.DiGraph) -> None:
+def _render_static_graph_svg(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
     if graph.number_of_nodes() == 0:
         return
     positions = nx.spring_layout(graph, seed=7)
@@ -2375,15 +2698,23 @@ def _render_static_graph_svg(graph: nx.DiGraph) -> None:
             f"<title>{relation}</title></line>"
         )
     node_markup = []
+    labeled_node_ids = _graph_label_node_ids(graph, label_mode)
     for node_id, attrs in sorted(graph.nodes(data=True), key=lambda item: str(item[0])):
         x, y = scaled_positions[str(node_id)]
-        label = html.escape(_short_graph_label(str(node_id)))
         node_type = str(attrs.get("node_type", "unknown"))
         color = _graph_node_color(node_type)
+        radius = max(5, min(9, _graph_node_size(node_type) / 1.5))
+        label = html.escape(_graph_node_text_label(str(node_id), dict(attrs), label_mode, labeled_node_ids))
+        text_markup = (
+            f'<text x="{x + radius + 4:.1f}" y="{y + 4:.1f}">{label}</text>'
+            if label
+            else ""
+        )
         node_markup.append(
-            f'<g><circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{color}">'
-            f"<title>{html.escape(str(node_id))}</title></circle>"
-            f'<text x="{x + 10:.1f}" y="{y + 4:.1f}">{label}</text></g>'
+            f'<g><circle cx="{x:.1f}" cy="{y:.1f}" r="{radius:.1f}" fill="{color}">'
+            f"<title>{html.escape(_graph_display_label(str(node_id), dict(attrs), max_chars=120))} "
+            f"({html.escape(str(node_id))})</title></circle>"
+            f"{text_markup}</g>"
         )
     svg = (
         f'<svg class="rn-static-graph" viewBox="0 0 {width} {height}" '
@@ -2396,26 +2727,6 @@ def _render_static_graph_svg(graph: nx.DiGraph) -> None:
         f'{"".join(edge_markup)}{"".join(node_markup)}</svg>'
     )
     st.markdown(svg, unsafe_allow_html=True)
-
-
-def _short_graph_label(node_id: str, max_chars: int = 30) -> str:
-    label = node_id.split(":", 1)[-1]
-    if len(label) <= max_chars:
-        return label
-    return label[: max_chars - 3] + "..."
-
-
-def _graph_node_color(node_type: str) -> str:
-    return {
-        "paper": "#1d4ed8",
-        "statement": "#64748b",
-        "method": "#0f766e",
-        "result": "#7c3aed",
-        "limitation": "#b91c1c",
-        "future_work": "#b45309",
-        "dataset": "#0369a1",
-        "background": "#475569",
-    }.get(node_type, "#334155")
 
 
 def _render_search_workspace(
@@ -2680,14 +2991,33 @@ def main() -> None:
     with graph_tab:
         search_results = st.session_state.get("last_search_results", [])
         subgraph = _subgraph_for_results(graph, search_results) if search_results else build_small_subgraph(graph)
+        graph_source_note = (
+            "Showing the search-linked subgraph from the latest result set."
+            if search_results
+            else "Showing a deterministic overview subgraph."
+        )
         _section_header(
             "Knowledge graph",
             "Search-linked graph sample when results are available; otherwise an overview subgraph.",
             "Graph",
         )
         _render_artifact_guidance(artifact_readiness, "graph")
-        st.json(graph_summary(subgraph))
-        _render_graph(subgraph)
+        available_node_types = _graph_available_node_types(subgraph)
+        control_cols = st.columns([2, 1])
+        selected_node_types = control_cols[0].multiselect(
+            "Node types",
+            available_node_types,
+            default=available_node_types,
+            format_func=_graph_node_type_label,
+            help="Filters the visible preview only; raw graph artifacts remain unchanged.",
+        )
+        label_mode = control_cols[1].selectbox("Labels", GRAPH_LABEL_MODES)
+        filtered_subgraph = _filter_graph_by_node_types(subgraph, selected_node_types)
+        _render_graph_summary(filtered_subgraph, graph_source_note)
+        _render_graph_legend(filtered_subgraph)
+        with st.expander("Graph summary data", expanded=False):
+            st.json(graph_summary(filtered_subgraph))
+        _render_graph(filtered_subgraph, label_mode=label_mode)
 
     with report_tab:
         _section_header("Exportable research brief", "A local Markdown brief generated from current artifacts.", "Report")
