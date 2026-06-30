@@ -27,10 +27,12 @@ from ui.streamlit_app import (
     _load_ui_settings,
     _render_dataframe,
     _render_plotly_chart,
+    _render_selected_evidence_handoff,
     _render_static_graph_svg,
     _result_card_preview,
     _result_card_title,
     _result_metadata_tags,
+    _selected_evidence_detail,
     _sort_gap_triage,
     _sort_hypothesis_triage,
     _statement_option_label,
@@ -628,6 +630,77 @@ def test_evidence_statement_ids_for_result_prefers_direct_and_related_ids():
     assert _evidence_statement_ids_for_result(statement_result, data) == ["stmt_direct"]
     assert _evidence_statement_ids_for_result(plan_result, data) == ["stmt_hyp"]
     assert _available_statement_ids(["stmt_hyp", "missing"], data) == ["stmt_hyp"]
+
+
+def test_selected_evidence_detail_builds_source_context_and_links():
+    data = {
+        "papers": [{"paper_id": "paper_001", "title": "Synthetic Paper"}],
+        "statements": [
+            {
+                "statement_id": "stmt_001",
+                "paper_id": "paper_001",
+                "chunk_id": "paper_001:chunk_0001",
+                "statement_type": "limitation",
+                "statement_text": (
+                    "Evaluation remains narrow because the local benchmark covers one dataset."
+                ),
+                "evidence_text": (
+                    "Evaluation remains narrow because the local benchmark covers one dataset."
+                ),
+            }
+        ],
+        "gaps": [{"gap_id": "gap_001", "source_statement_ids": ["stmt_001"]}],
+        "hypotheses": [{"hypothesis_id": "hyp_001", "evidence_statement_ids": ["stmt_001"]}],
+        "experiment_plans": [{"hypothesis_id": "hyp_001", "plan": {"method": "Compare benchmarks."}}],
+    }
+
+    detail = _selected_evidence_detail(data, "stmt_001")
+
+    assert detail["status"] == "available"
+    assert detail["statement"]["paper_id"] == "paper_001"
+    assert detail["result"]["statement_id"] == "stmt_001"
+    assert detail["quality"]["statement_id"] == "stmt_001"
+    assert len(detail["related"]["gaps"]) == 1
+    assert len(detail["related"]["hypotheses"]) == 1
+    assert detail["chain"]["evidence"][0]["paper_title"] == "Synthetic Paper"
+    assert _selected_evidence_detail(data, "missing") == {
+        "status": "missing",
+        "statement_id": "missing",
+        "message": "Selected evidence is not available in the current statement table.",
+    }
+
+
+def test_selected_evidence_handoff_renders_source_detail_inline(monkeypatch):
+    data = {
+        "statements": [
+            {
+                "statement_id": "stmt_001",
+                "paper_id": "paper_001",
+                "chunk_id": "chunk_001",
+                "statement_type": "result",
+                "statement_text": "The local system reports a grounded result.",
+                "evidence_text": "The local system reports a grounded result.",
+            }
+        ],
+        "gaps": [],
+        "hypotheses": [],
+        "experiment_plans": [],
+    }
+    calls = []
+
+    def fake_markdown(value, **kwargs):
+        calls.append((value, kwargs))
+
+    monkeypatch.setattr("ui.streamlit_app.st.markdown", fake_markdown)
+
+    assert _render_selected_evidence_handoff(data, "stmt_001", "gap: gap_001") is True
+
+    markup, kwargs = calls[0]
+    assert "Selected evidence inspector" in markup
+    assert "Selected from gap: gap_001" in markup
+    assert "Statement stmt_001" in markup
+    assert "The local system reports a grounded result." in markup
+    assert kwargs == {"unsafe_allow_html": True}
 
 
 def test_result_card_title_prefers_research_text_over_internal_ids():

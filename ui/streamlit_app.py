@@ -70,6 +70,7 @@ STATEMENT_TYPES = ["all", "method", "result", "limitation", "future_work", "data
 RESULT_TYPES = ["all", "statements", "gaps", "hypotheses", "experiment_plans"]
 SELECTED_EVIDENCE_KEY = "selected_evidence_statement_id"
 SELECTED_EVIDENCE_SOURCE_KEY = "selected_evidence_source"
+EVIDENCE_SELECTBOX_KEY = "evidence_inspector_statement_selectbox"
 LAST_PIPELINE_RUN_KEY = "last_local_pipeline_run"
 PIPELINE_COMMANDS = [
     "uv run python -m scripts.ingest_papers --papers-dir data/papers --db-path data/processed/papers.sqlite --extract-statements --filter-statements --max-statements-per-type-per-paper 30",
@@ -595,6 +596,42 @@ def _inject_global_styles() -> None:
             color: var(--rn-muted);
             font-size: 0.78rem;
             margin-bottom: 5px;
+        }
+        .rn-evidence-panel {
+            border: 1px solid #bfdbfe;
+            border-left: 4px solid var(--rn-blue);
+            border-radius: 8px;
+            background: #f8fbff;
+            padding: 10px 12px;
+            margin: 8px 0 10px;
+        }
+        .rn-evidence-panel-title {
+            color: var(--rn-ink);
+            font-weight: 760;
+            line-height: 1.3;
+            margin: 2px 0 5px;
+            overflow-wrap: anywhere;
+        }
+        .rn-evidence-panel-meta {
+            color: var(--rn-muted);
+            font-size: 0.78rem;
+            font-weight: 650;
+            margin-bottom: 7px;
+            overflow-wrap: anywhere;
+        }
+        .rn-evidence-panel-subhead {
+            color: var(--rn-blue);
+            font-size: 0.72rem;
+            font-weight: 760;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+        .rn-evidence-panel-text {
+            color: #374151;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            margin-top: 2px;
+            overflow-wrap: anywhere;
         }
         .rn-graph-legend {
             display: flex;
@@ -1517,6 +1554,153 @@ def _select_evidence_statement(statement_id: str, source_label: str) -> None:
     st.session_state[SELECTED_EVIDENCE_SOURCE_KEY] = source_label
 
 
+def _statement_result_payload(statement_id: str, statement: dict) -> dict:
+    statement_text = statement.get("statement_text", "")
+    return {
+        "result_type": "statement",
+        "result_id": statement_id,
+        "statement_id": statement_id,
+        "title": _clip_card_text(statement_text or statement_id, 96),
+        "matched_text": statement_text,
+        "evidence_statement_ids": [statement_id],
+        "paper_id": statement.get("paper_id", ""),
+        "statement_type": statement.get("statement_type", ""),
+    }
+
+
+def _selected_evidence_detail(data: dict, statement_id: str) -> dict:
+    normalized_id = str(statement_id or "").strip()
+    if not normalized_id:
+        return {
+            "status": "empty",
+            "message": "No evidence statement is selected yet.",
+        }
+    statement_lookup = _statement_lookup_from_data(data)
+    statement = statement_lookup.get(normalized_id)
+    if not statement:
+        return {
+            "status": "missing",
+            "statement_id": normalized_id,
+            "message": "Selected evidence is not available in the current statement table.",
+        }
+    statement = dict(statement)
+    statement["statement_id"] = str(statement.get("statement_id") or normalized_id)
+    selected_result = _statement_result_payload(normalized_id, statement)
+    related = get_related_items(
+        selected_result,
+        data.get("gaps", []),
+        data.get("hypotheses", []),
+        data.get("experiment_plans", []),
+    )
+    return {
+        "status": "available",
+        "statement_id": normalized_id,
+        "statement": statement,
+        "quality": score_statement_quality(statement),
+        "result": selected_result,
+        "related": related,
+        "chain": build_evidence_chain(selected_result, data),
+    }
+
+
+def _selected_evidence_source_matches(statement_id: str, source_label: str) -> bool:
+    return (
+        st.session_state.get(SELECTED_EVIDENCE_KEY) == statement_id
+        and st.session_state.get(SELECTED_EVIDENCE_SOURCE_KEY) == source_label
+    )
+
+
+def _render_selected_evidence_handoff(data: dict, statement_id: str, source_label: str) -> bool:
+    detail = _selected_evidence_detail(data, statement_id)
+    if detail["status"] == "empty":
+        return False
+    if detail["status"] == "missing":
+        st.warning(f"{detail['message']} Statement ID: {detail['statement_id']}.")
+        return False
+
+    statement = detail["statement"]
+    statement_text = _clip_card_text(statement.get("statement_text", ""), 360)
+    evidence_text = _clip_card_text(statement.get("evidence_text", ""), 360)
+    title = _clip_card_text(statement_text or statement_id, 120)
+    meta = " | ".join(
+        item
+        for item in [
+            f"Selected from {source_label}" if source_label else "",
+            f"Statement {detail['statement_id']}",
+            f"Type {statement.get('statement_type', 'unknown')}",
+            f"Paper {statement.get('paper_id', 'unknown')}",
+            f"Chunk {statement.get('chunk_id', 'unknown')}",
+        ]
+        if item
+    )
+    st.markdown(
+        f"""
+        <div class="rn-evidence-panel">
+          <div class="rn-mini-label">Selected evidence inspector</div>
+          <div class="rn-evidence-panel-title">{html.escape(title)}</div>
+          <div class="rn-evidence-panel-meta">{html.escape(meta)}</div>
+          <div class="rn-evidence-panel-subhead">Source statement</div>
+          <div class="rn-evidence-panel-text">{html.escape(statement_text or "No statement text available.")}</div>
+          <div class="rn-evidence-panel-subhead">Evidence snippet</div>
+          <div class="rn-evidence-panel-text">{html.escape(evidence_text or "No evidence snippet available.")}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return True
+
+
+def _render_selected_evidence_inspector(data: dict, statement_id: str, source_label: str | None = None) -> bool:
+    detail = _selected_evidence_detail(data, statement_id)
+    if detail["status"] == "empty":
+        st.info(detail["message"])
+        return False
+    if detail["status"] == "missing":
+        st.warning(f"{detail['message']} Statement ID: {detail['statement_id']}.")
+        return False
+
+    selected_statement = detail["statement"]
+    quality = detail["quality"]
+    related = detail["related"]
+    selected_result = detail["result"]
+    if source_label:
+        st.info(f"Selected from {source_label}.")
+    _render_tag_list(
+        [
+            ("statement", detail["statement_id"], ""),
+            ("type", selected_statement.get("statement_type", "unknown"), ""),
+            ("paper", selected_statement.get("paper_id", "unknown"), ""),
+            ("chunk", selected_statement.get("chunk_id", "unknown"), ""),
+        ]
+    )
+    _metric_cards(
+        [
+            ("Grounding", quality["grounding_confidence"]),
+            ("Usefulness", quality["usefulness_score"]),
+            ("Citation risk", quality["citation_reference_risk"]),
+            ("Overall quality", quality["overall_quality"]),
+        ],
+        columns=4,
+    )
+    detail_cols = st.columns([2, 1])
+    with detail_cols[0]:
+        st.markdown("#### Source statement")
+        st.write(selected_statement.get("statement_text"))
+        st.caption(f"Paper: {selected_statement.get('paper_id')} | Chunk: {selected_statement.get('chunk_id')}")
+        st.markdown("#### Evidence snippet")
+        st.write(selected_statement.get("evidence_text"))
+    with detail_cols[1]:
+        st.markdown("#### Linked outputs")
+        st.metric("Gaps", len(related["gaps"]))
+        st.metric("Hypotheses", len(related["hypotheses"]))
+        st.metric("Experiment plans", len(related["experiment_plans"]))
+    with st.expander("Readable linked evidence chain", expanded=True):
+        _render_evidence_chain(detail["chain"])
+    with st.expander("Technical raw linked data"):
+        st.json({"selected_result": selected_result, "related": related})
+    return True
+
+
 def _render_evidence_action(
     statement_ids: list[str],
     data: dict,
@@ -1536,7 +1720,9 @@ def _render_evidence_action(
     target_id = available_ids[0]
     if st.button("Inspect evidence", key=key):
         _select_evidence_statement(target_id, source_label)
-        st.success("Evidence selected. Open the Evidence Inspector tab to review it.")
+        st.success("Showing selected evidence below and in the Evidence Inspector tab.")
+    if _selected_evidence_source_matches(target_id, source_label):
+        _render_selected_evidence_handoff(data, target_id, source_label)
     if len(available_ids) > 1:
         st.caption(f"{len(available_ids)} evidence statements linked; the first is selected.")
 
@@ -2913,58 +3099,19 @@ def main() -> None:
             selected_index = (
                 statement_ids.index(requested_statement_id) if requested_statement_id else 0
             )
+            selectbox_key = f"{EVIDENCE_SELECTBOX_KEY}-{requested_statement_id or 'default'}"
             selected_statement_id = st.selectbox(
                 "Statement",
                 statement_ids,
                 index=selected_index,
                 format_func=lambda item: statement_labels.get(str(item), str(item)),
+                key=selectbox_key,
             )
+            if selected_statement_id != requested_statement_id:
+                st.session_state[SELECTED_EVIDENCE_SOURCE_KEY] = ""
             st.session_state[SELECTED_EVIDENCE_KEY] = selected_statement_id
-            selected_source = st.session_state.get(SELECTED_EVIDENCE_SOURCE_KEY)
-            if selected_source and selected_statement_id == requested_statement_id:
-                st.info(f"Selected from {selected_source}.")
-            selected_statement = (
-                statements[statements["statement_id"] == selected_statement_id].iloc[0].to_dict()
-            )
-            quality = score_statement_quality(selected_statement)
-            _metric_cards(
-                [
-                    ("Grounding", quality["grounding_confidence"]),
-                    ("Usefulness", quality["usefulness_score"]),
-                    ("Citation risk", quality["citation_reference_risk"]),
-                    ("Overall quality", quality["overall_quality"]),
-                ],
-                columns=4,
-            )
-            detail_cols = st.columns([2, 1])
-            with detail_cols[0]:
-                st.markdown("#### Source statement")
-                st.write(selected_statement.get("statement_text"))
-                st.caption(f"Paper: {selected_statement.get('paper_id')} | Chunk: {selected_statement.get('chunk_id')}")
-                st.markdown("#### Evidence snippet")
-                st.write(selected_statement.get("evidence_text"))
-            with detail_cols[1]:
-                selected_result = {
-                    "result_type": "statement",
-                    "result_id": selected_statement_id,
-                    "statement_id": selected_statement_id,
-                    "title": selected_statement_id,
-                    "matched_text": selected_statement.get("statement_text", ""),
-                }
-                related = get_related_items(
-                    selected_result,
-                    data["gaps"],
-                    data["hypotheses"],
-                    data["experiment_plans"],
-                )
-                st.markdown("#### Linked outputs")
-                st.metric("Gaps", len(related["gaps"]))
-                st.metric("Hypotheses", len(related["hypotheses"]))
-                st.metric("Experiment plans", len(related["experiment_plans"]))
-            with st.expander("Readable linked evidence chain", expanded=True):
-                _render_evidence_chain(build_evidence_chain(selected_result, data))
-            with st.expander("Technical raw linked data"):
-                st.json(related)
+            selected_source = str(st.session_state.get(SELECTED_EVIDENCE_SOURCE_KEY, "") or "")
+            _render_selected_evidence_inspector(data, selected_statement_id, selected_source)
 
     with discoveries_tab:
         _render_artifact_guidance(artifact_readiness, "discoveries")
