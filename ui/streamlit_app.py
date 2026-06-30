@@ -141,7 +141,7 @@ def _inject_global_styles() -> None:
             display: none;
         }
         .block-container {
-            padding-top: 1.25rem;
+            padding-top: 0.85rem;
             padding-left: clamp(1rem, 4vw, 3rem);
             padding-right: clamp(1rem, 4vw, 3rem);
             padding-bottom: 3rem;
@@ -213,16 +213,16 @@ def _inject_global_styles() -> None:
             border: 1px solid var(--rn-line);
             border-left: 4px solid var(--rn-blue);
             border-radius: 8px;
-            padding: 16px 18px;
+            padding: 12px 14px;
             background: #ffffff;
-            margin-bottom: 12px;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+            margin-bottom: 8px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
         }
         .rn-hero-top {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
+            grid-template-columns: minmax(0, 1fr) minmax(220px, 285px);
             justify-content: space-between;
-            gap: 18px;
+            gap: 14px;
             align-items: flex-start;
         }
         .rn-kicker {
@@ -234,16 +234,16 @@ def _inject_global_styles() -> None:
             margin-bottom: 5px;
         }
         .rn-title {
-            font-size: 1.58rem;
+            font-size: 1.42rem;
             line-height: 1.15;
             font-weight: 760;
-            margin: 0 0 4px;
+            margin: 0 0 3px;
             color: var(--rn-ink);
             overflow-wrap: anywhere;
         }
         .rn-subtitle {
             color: var(--rn-muted);
-            font-size: 0.93rem;
+            font-size: 0.88rem;
             max-width: 780px;
             margin: 0;
         }
@@ -251,7 +251,7 @@ def _inject_global_styles() -> None:
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
-            margin-top: 8px;
+            margin-top: 6px;
         }
         .rn-pill {
             display: inline-flex;
@@ -280,7 +280,7 @@ def _inject_global_styles() -> None:
             border: 1px solid var(--rn-line);
             border-radius: 8px;
             background: #f8fafc;
-            padding: 9px 11px;
+            padding: 8px 10px;
             min-width: 0;
         }
         .rn-score-label {
@@ -292,7 +292,7 @@ def _inject_global_styles() -> None:
         }
         .rn-score-value {
             color: var(--rn-ink);
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             font-weight: 760;
             line-height: 1.1;
         }
@@ -395,9 +395,15 @@ def _inject_global_styles() -> None:
             border-left: 4px solid var(--rn-amber);
             border-radius: 8px;
             background: #fffbeb;
-            padding: 9px 11px;
-            margin: 4px 0 10px;
+            padding: 8px 10px;
+            margin: 4px 0 8px;
             color: #1f2937;
+        }
+        .rn-artifact-meta {
+            color: #475569;
+            font-size: 0.78rem;
+            font-weight: 650;
+            margin-top: 3px;
         }
         .rn-review-banner.fail {
             border-color: #fecaca;
@@ -507,29 +513,29 @@ def _inject_global_styles() -> None:
                 padding: 0.75rem 0.65rem 2rem;
             }
             .rn-hero {
-                padding: 12px;
-                margin-bottom: 8px;
+                padding: 10px;
+                margin-bottom: 6px;
             }
             .rn-hero-top {
                 grid-template-columns: minmax(0, 1fr);
-                gap: 10px;
+                gap: 8px;
             }
             .rn-kicker {
                 font-size: 0.66rem;
                 margin-bottom: 4px;
             }
             .rn-title {
-                font-size: 1.34rem;
+                font-size: 1.22rem;
             }
             .rn-subtitle {
-                font-size: 0.84rem;
+                font-size: 0.8rem;
             }
             .rn-pill-row {
                 display: none;
             }
             .rn-hero-score {
                 width: 100%;
-                padding: 8px 9px;
+                padding: 7px 8px;
             }
             .rn-score-label,
             .rn-score-note {
@@ -598,6 +604,7 @@ def _render_header(counts: dict, evaluation: dict) -> None:
     status = evaluation_status_summary(evaluation)
     safety = status["safety_label"]
     grounding = status["grounding_label"]
+    corpus_note = f"{counts.get('papers', 0)} papers | {counts.get('statements', 0)} statements"
     st.markdown(
         f"""
         <div class="rn-hero">
@@ -616,7 +623,8 @@ def _render_header(counts: dict, evaluation: dict) -> None:
             <div class="rn-hero-score">
               <div class="rn-score-label">Evaluation</div>
               <div class="rn-score-value">{html.escape(status["headline"])}</div>
-              <div class="rn-score-note">Safety {html.escape(safety)} | Grounding {html.escape(grounding)} | {counts.get("statements", 0)} statements</div>
+              <div class="rn-score-note">{html.escape(corpus_note)}</div>
+              <div class="rn-score-note">Safety {html.escape(safety)} | Grounding {html.escape(grounding)}</div>
             </div>
           </div>
         </div>
@@ -645,37 +653,50 @@ def _render_status_strip(counts: dict, evaluation: dict) -> None:
     st.markdown(f'<div class="rn-status-strip">{"".join(chips)}</div>', unsafe_allow_html=True)
 
 
-def _render_artifact_readiness(readiness: dict[str, object]) -> None:
-    artifacts = list(readiness.get("artifacts", []) or [])
-    problem_artifacts = list(readiness.get("problem_artifacts", []) or [])
+def _artifact_readiness_summary(readiness: dict[str, object]) -> str:
     counts = dict(readiness.get("counts", {}) or {})
+    ready = counts.get("ready", 0)
+    missing = counts.get("missing", 0)
+    stale = counts.get("stale", 0)
+    total = counts.get("total", 0)
+    if readiness.get("status") == "ready":
+        return f"{ready}/{total} artifacts ready"
+    parts = [f"{ready}/{total} ready"]
+    if missing:
+        parts.append(f"{missing} missing")
+    if stale:
+        parts.append(f"{stale} stale")
+    return " | ".join(parts)
+
+
+def _render_artifact_readiness(
+    readiness: dict[str, object],
+    *,
+    include_details: bool = True,
+) -> None:
     status = str(readiness.get("status", "partial"))
     banner_class = _artifact_banner_class(status)
-    items = [] if problem_artifacts else artifacts[:1]
-    item_markup = "".join(
-        "<li>"
-        f"<strong>{html.escape(str(item.get('label', 'Artifact')))}</strong>: "
-        f"{html.escape(str(item.get('status', 'unknown')).title())}. "
-        f"{html.escape(str(item.get('reason', '')))}"
-        "</li>"
-        for item in items
-    )
-    if items and problem_artifacts and len(problem_artifacts) > len(items):
-        remaining_count = len(problem_artifacts) - len(items)
-        item_markup += f"<li>{remaining_count} more artifact(s) need attention.</li>"
     headline = html.escape(str(readiness.get("headline", "Artifact readiness")))
     summary = html.escape(str(readiness.get("summary", "")))
-    list_markup = f"<ul>{item_markup}</ul>" if item_markup else ""
+    artifact_summary = html.escape(_artifact_readiness_summary(readiness))
     st.markdown(
         f"""
         <div class="rn-review-banner {banner_class}">
           <div class="rn-review-title">{headline}</div>
           <div class="rn-review-text">{summary}</div>
-          {list_markup}
+          <div class="rn-artifact-meta">{artifact_summary}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+    if include_details:
+        _render_artifact_readiness_details(readiness)
+
+
+def _render_artifact_readiness_details(readiness: dict[str, object]) -> None:
+    artifacts = list(readiness.get("artifacts", []) or [])
+    problem_artifacts = list(readiness.get("problem_artifacts", []) or [])
+    counts = dict(readiness.get("counts", {}) or {})
     if problem_artifacts:
         _metric_cards(
             [
@@ -686,12 +707,12 @@ def _render_artifact_readiness(readiness: dict[str, object]) -> None:
             ],
             columns=4,
         )
-        with st.expander("Artifact recovery guidance", expanded=False):
-            _render_recovery_steps(problem_artifacts)
-            _render_artifact_status_table(readiness)
+        _render_recovery_steps(problem_artifacts)
+        _render_artifact_status_table(readiness)
     else:
-        with st.expander("Artifact details", expanded=False):
-            _render_artifact_status_table(readiness)
+        if artifacts:
+            st.caption("All expected local artifacts are ready enough for the current inputs.")
+        _render_artifact_status_table(readiness)
 
 
 def _render_artifact_guidance(readiness: dict[str, object], artifact_key: str) -> None:
@@ -2299,14 +2320,13 @@ def main() -> None:
     artifact_readiness = build_artifact_readiness(ARTIFACT_SPECS)
 
     _render_header(counts, evaluation)
-    _render_status_strip(counts, evaluation)
-    _render_artifact_readiness(artifact_readiness)
+    _render_artifact_readiness(artifact_readiness, include_details=False)
 
     if not DEFAULT_DB_PATH.exists():
         _show_pipeline_instructions()
 
     _render_search_workspace(data, evaluation, default_search_query, max_search_results)
-    with st.expander("Project metrics", expanded=False):
+    with st.expander("Project metrics and artifact details", expanded=False):
         _metric_cards(
             [
                 ("Papers", counts["papers"]),
@@ -2320,6 +2340,8 @@ def main() -> None:
             ],
             columns=4,
         )
+        st.markdown("#### Artifact readiness")
+        _render_artifact_readiness_details(artifact_readiness)
     _render_evaluation_caveats(evaluation)
 
     (

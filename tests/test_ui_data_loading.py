@@ -6,6 +6,7 @@ import networkx as nx
 from tools.graph_tools import export_graphml
 from tools.storage_tools import initialize_database, save_chunk, save_paper, save_statement
 from ui.streamlit_app import (
+    _artifact_readiness_summary,
     _available_statement_ids,
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
@@ -282,6 +283,27 @@ def test_artifact_readiness_flags_missing_and_stale_outputs(tmp_path):
     assert readiness["counts"]["stale"] == 3
     assert "older than input artifact" in reasons["graph"]
     assert "input artifact is missing" in reasons["evaluation"]
+
+
+def test_artifact_readiness_summary_keeps_top_status_compact():
+    assert (
+        _artifact_readiness_summary(
+            {
+                "status": "ready",
+                "counts": {"ready": 5, "missing": 0, "stale": 0, "total": 5},
+            }
+        )
+        == "5/5 artifacts ready"
+    )
+    assert (
+        _artifact_readiness_summary(
+            {
+                "status": "partial",
+                "counts": {"ready": 2, "missing": 1, "stale": 2, "total": 5},
+            }
+        )
+        == "2/5 ready | 1 missing | 2 stale"
+    )
 
 
 def test_evaluation_status_distinguishes_caveats_from_pass():
