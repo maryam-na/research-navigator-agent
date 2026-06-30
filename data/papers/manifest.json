@@ -3,45 +3,49 @@
   "license_requirement": "Use only synthetic, sample, or open-access papers. Verify source rights before adding new PDFs.",
   "papers": [
     {
-      "filename": "paper_01.pdf",
-      "paper_id": "paper_01",
-      "title": "Local MVP paper 01",
-      "source_type": "local",
-      "license_notes": "Verify open-access or synthetic status before external sharing.",
-      "topic": "research discovery"
+      "filename": "paper-01.pdf",
+      "paper_id": "paper-01",
+      "title": "paper 01",
+      "source_type": "local_upload",
+      "license_notes": "User confirmed this local PDF is synthetic, sample, open-access, or otherwise permitted.",
+      "topic": "user uploaded",
+      "permission_confirmed": true
     },
     {
-      "filename": "paper_02.pdf",
-      "paper_id": "paper_02",
-      "title": "Local MVP paper 02",
-      "source_type": "local",
-      "license_notes": "Verify open-access or synthetic status before external sharing.",
-      "topic": "research discovery"
+      "filename": "paper-05.pdf",
+      "paper_id": "paper-05",
+      "title": "paper 05",
+      "source_type": "local_upload",
+      "license_notes": "User confirmed this local PDF is synthetic, sample, open-access, or otherwise permitted.",
+      "topic": "user uploaded",
+      "permission_confirmed": true
     },
     {
-      "filename": "paper_03.pdf",
-      "paper_id": "paper_03",
-      "title": "Local MVP paper 03",
+      "filename": "paper-07.pdf",
+      "paper_id": "paper-07",
+      "title": "paper 07",
       "source_type": "local",
-      "license_notes": "Verify open-access or synthetic status before external sharing.",
-      "topic": "research discovery"
+      "license_notes": "Use only synthetic, sample, open-access, or otherwise permitted papers. Verify source rights before adding new PDFs.",
+      "topic": "research discovery",
+      "permission_confirmed": false
     },
     {
-      "filename": "paper_04.pdf",
-      "paper_id": "paper_04",
-      "title": "Local MVP paper 04",
-      "source_type": "local",
-      "license_notes": "Verify open-access or synthetic status before external sharing.",
-      "topic": "research discovery"
+      "filename": "paper-07_2.pdf",
+      "paper_id": "paper-07_2",
+      "title": "paper 07 2",
+      "source_type": "local_upload",
+      "license_notes": "User confirmed this local PDF is synthetic, sample, open-access, or otherwise permitted.",
+      "topic": "user uploaded",
+      "permission_confirmed": true
     },
     {
-      "filename": "paper_05.pdf",
-      "paper_id": "paper_05",
-      "title": "Local MVP paper 05",
-      "source_type": "local",
-      "license_notes": "Verify open-access or synthetic status before external sharing.",
-      "topic": "research discovery"
+      "filename": "paper_06.pdf",
+      "paper_id": "paper_06",
+      "title": "paper 06",
+      "source_type": "local_upload",
+      "license_notes": "User confirmed this local PDF is synthetic, sample, open-access, or otherwise permitted.",
+      "topic": "user uploaded",
+      "permission_confirmed": true
     }
   ]
 }
-

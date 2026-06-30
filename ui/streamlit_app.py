@@ -132,10 +132,20 @@ def _inject_global_styles() -> None:
             --rn-amber: #b45309;
             --rn-red: #b91c1c;
         }
+        .stApp {
+            background: #f7f9fc;
+        }
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"] {
+            display: none;
+        }
         .block-container {
-            padding-top: 0.9rem;
+            padding-top: 1.25rem;
+            padding-left: clamp(1rem, 4vw, 3rem);
+            padding-right: clamp(1rem, 4vw, 3rem);
             padding-bottom: 3rem;
-            max-width: 1380px;
+            max-width: 1240px;
         }
         h1, h2, h3, h4 {
             letter-spacing: 0;
@@ -158,20 +168,70 @@ def _inject_global_styles() -> None:
             border-radius: 8px;
             overflow: hidden;
         }
+        div[data-testid="stButton"] button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"],
+        div[data-testid="stFormSubmitButton"] button[kind="primary"],
+        div[data-testid="stDownloadButton"] button[kind="primary"],
+        button[data-testid="stBaseButton-primaryFormSubmit"],
+        button[data-testid="stBaseButton-primary"] {
+            background: var(--rn-blue);
+            border-color: var(--rn-blue);
+            color: #ffffff;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"]:hover,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
+        div[data-testid="stDownloadButton"] button[kind="primary"]:hover,
+        button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+        button[data-testid="stBaseButton-primary"]:hover {
+            background: #1e40af;
+            border-color: #1e40af;
+            color: #ffffff;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:focus,
+        div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"]:focus,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"]:focus,
+        div[data-testid="stDownloadButton"] button[kind="primary"]:focus,
+        button[data-testid="stBaseButton-primaryFormSubmit"]:focus,
+        button[data-testid="stBaseButton-primary"]:focus {
+            box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.24);
+            outline: none;
+        }
+        div[data-testid="stCodeBlock"],
+        div[data-testid="stCodeBlock"] pre,
+        div[data-testid="stCodeBlock"] code {
+            max-width: 100%;
+        }
+        div[data-testid="stCodeBlock"] {
+            overflow: hidden;
+        }
+        div[data-testid="stCodeBlock"] pre {
+            overflow-x: auto;
+            white-space: pre;
+        }
         .rn-hero {
             border: 1px solid var(--rn-line);
-            border-left: 5px solid var(--rn-blue);
+            border-left: 4px solid var(--rn-blue);
             border-radius: 8px;
-            padding: 14px 18px;
-            background: linear-gradient(90deg, #ffffff 0%, #f8fbff 100%);
-            margin-bottom: 10px;
+            padding: 16px 18px;
+            background: #ffffff;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
         }
         .rn-hero-top {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
             justify-content: space-between;
-            gap: 20px;
+            gap: 18px;
             align-items: flex-start;
-            flex-wrap: wrap;
+        }
+        .rn-kicker {
+            color: var(--rn-blue);
+            font-size: 0.72rem;
+            font-weight: 760;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 5px;
         }
         .rn-title {
             font-size: 1.58rem;
@@ -179,6 +239,7 @@ def _inject_global_styles() -> None:
             font-weight: 760;
             margin: 0 0 4px;
             color: var(--rn-ink);
+            overflow-wrap: anywhere;
         }
         .rn-subtitle {
             color: var(--rn-muted);
@@ -216,11 +277,11 @@ def _inject_global_styles() -> None:
             background: #fffbeb;
         }
         .rn-hero-score {
-            min-width: 190px;
             border: 1px solid var(--rn-line);
             border-radius: 8px;
-            background: #ffffff;
+            background: #f8fafc;
             padding: 9px 11px;
+            min-width: 0;
         }
         .rn-score-label {
             color: var(--rn-muted);
@@ -269,20 +330,21 @@ def _inject_global_styles() -> None:
             overflow-wrap: anywhere;
         }
         .rn-status-strip {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 8px;
             margin: 8px 0 10px;
         }
         .rn-status-chip {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 6px;
+            display: grid;
+            gap: 2px;
             border: 1px solid var(--rn-line);
             border-radius: 8px;
             background: #ffffff;
-            padding: 6px 9px;
+            padding: 7px 9px;
             min-height: 34px;
+            min-width: 0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
         }
         .rn-status-label {
             color: var(--rn-muted);
@@ -294,6 +356,8 @@ def _inject_global_styles() -> None:
             color: var(--rn-ink);
             font-size: 0.92rem;
             font-weight: 760;
+            line-height: 1.1;
+            overflow-wrap: anywhere;
         }
         .rn-section {
             margin-top: 6px;
@@ -440,17 +504,22 @@ def _inject_global_styles() -> None:
         }
         @media (max-width: 700px) {
             .block-container {
-                padding: 0.65rem 0.65rem 2rem;
+                padding: 0.75rem 0.65rem 2rem;
             }
             .rn-hero {
-                padding: 11px 12px;
+                padding: 12px;
                 margin-bottom: 8px;
             }
             .rn-hero-top {
-                gap: 8px;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 10px;
+            }
+            .rn-kicker {
+                font-size: 0.66rem;
+                margin-bottom: 4px;
             }
             .rn-title {
-                font-size: 1.28rem;
+                font-size: 1.34rem;
             }
             .rn-subtitle {
                 font-size: 0.84rem;
@@ -459,7 +528,6 @@ def _inject_global_styles() -> None:
                 display: none;
             }
             .rn-hero-score {
-                min-width: 0;
                 width: 100%;
                 padding: 8px 9px;
             }
@@ -471,13 +539,15 @@ def _inject_global_styles() -> None:
                 font-size: 0.95rem;
             }
             .rn-status-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 6px;
                 margin: 6px 0 8px;
             }
             .rn-status-chip {
-                flex: 1 1 46%;
-                min-width: 0;
                 padding: 5px 7px;
+            }
+            .rn-status-chip:last-child {
+                grid-column: 1 / -1;
             }
             .rn-status-label {
                 font-size: 0.66rem;
@@ -533,6 +603,7 @@ def _render_header(counts: dict, evaluation: dict) -> None:
         <div class="rn-hero">
           <div class="rn-hero-top">
             <div>
+              <div class="rn-kicker">Local research workspace</div>
               <div class="rn-title">ResearchNavigator Agent</div>
               <p class="rn-subtitle">Local, grounded research discovery for small scientific paper collections.</p>
               <div class="rn-pill-row">
@@ -580,7 +651,7 @@ def _render_artifact_readiness(readiness: dict[str, object]) -> None:
     counts = dict(readiness.get("counts", {}) or {})
     status = str(readiness.get("status", "partial"))
     banner_class = _artifact_banner_class(status)
-    items = problem_artifacts[:4] if problem_artifacts else artifacts[:1]
+    items = [] if problem_artifacts else artifacts[:1]
     item_markup = "".join(
         "<li>"
         f"<strong>{html.escape(str(item.get('label', 'Artifact')))}</strong>: "
@@ -589,17 +660,18 @@ def _render_artifact_readiness(readiness: dict[str, object]) -> None:
         "</li>"
         for item in items
     )
-    if problem_artifacts and len(problem_artifacts) > len(items):
+    if items and problem_artifacts and len(problem_artifacts) > len(items):
         remaining_count = len(problem_artifacts) - len(items)
         item_markup += f"<li>{remaining_count} more artifact(s) need attention.</li>"
     headline = html.escape(str(readiness.get("headline", "Artifact readiness")))
     summary = html.escape(str(readiness.get("summary", "")))
+    list_markup = f"<ul>{item_markup}</ul>" if item_markup else ""
     st.markdown(
         f"""
         <div class="rn-review-banner {banner_class}">
           <div class="rn-review-title">{headline}</div>
           <div class="rn-review-text">{summary}</div>
-          <ul>{item_markup}</ul>
+          {list_markup}
         </div>
         """,
         unsafe_allow_html=True,
@@ -614,8 +686,8 @@ def _render_artifact_readiness(readiness: dict[str, object]) -> None:
             ],
             columns=4,
         )
-        _render_recovery_steps(problem_artifacts)
-        with st.expander("Artifact details", expanded=True):
+        with st.expander("Artifact recovery guidance", expanded=False):
+            _render_recovery_steps(problem_artifacts)
             _render_artifact_status_table(readiness)
     else:
         with st.expander("Artifact details", expanded=False):
