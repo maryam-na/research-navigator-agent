@@ -59,6 +59,13 @@ STOPWORDS = {
     "would",
 }
 
+GENERATED_DISCOVERY_PREFIXES = (
+    "A possible research gap is suggested by a reported limitation:",
+    "A possible research gap is suggested by reported future work:",
+    "A possible research gap is suggested by:",
+    "A testable hypothesis could be that",
+)
+
 
 def load_table(db_path: str | Path, table_name: str) -> pd.DataFrame:
     path = Path(db_path)
@@ -264,21 +271,27 @@ def prepare_hypothesis_triage(
     )
 
 
+def humanize_discovery_text(text: str, fallback: str = "Discovery") -> str:
+    """Remove generated lead-in boilerplate while preserving the research content."""
+
+    normalized = re.sub(r"\s+", " ", text).strip()
+    for prefix in GENERATED_DISCOVERY_PREFIXES:
+        if normalized.lower().startswith(prefix.lower()):
+            normalized = normalized[len(prefix):].strip(" :-")
+            break
+    normalized = re.sub(r"\bgap\s+gap_[A-Za-z0-9_-]+\b", "the linked gap", normalized)
+    normalized = re.sub(r"\bgap_[A-Za-z0-9_-]+\b", "linked gap", normalized)
+    normalized = re.sub(r"\bhyp_[A-Za-z0-9_-]+\b", "hypothesis", normalized)
+    normalized = re.sub(r"\bstmt_[A-Za-z0-9_-]+\b", "source evidence", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = normalized[:1].upper() + normalized[1:] if normalized else str(fallback)
+    return normalized
+
+
 def discovery_label(text: str, fallback: str = "Discovery", max_chars: int = 96) -> str:
     """Create a readable label from generated discovery text while keeping IDs secondary."""
 
-    normalized = re.sub(r"\s+", " ", text).strip()
-    prefixes = (
-        "A possible research gap is suggested by a reported limitation:",
-        "A possible research gap is suggested by reported future work:",
-        "A possible research gap is suggested by:",
-        "A testable hypothesis could be that",
-    )
-    for prefix in prefixes:
-        if normalized.lower().startswith(prefix.lower()):
-            normalized = normalized[len(prefix):].strip()
-            break
-    normalized = normalized[:1].upper() + normalized[1:] if normalized else str(fallback)
+    normalized = humanize_discovery_text(text, fallback=fallback)
     return _clip_text(normalized, max_chars)
 
 

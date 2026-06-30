@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 import sys
 from pathlib import Path
 
@@ -32,10 +33,12 @@ from ui.data_access import (
     build_ingestion_status,
     build_research_themes,
     create_research_brief,
+    discovery_label,
     evidence_for_statement_ids,
     file_presence,
     get_related_items,
     graph_to_tables,
+    humanize_discovery_text,
     load_graph,
     load_table,
     prepare_hypothesis_triage,
@@ -437,6 +440,21 @@ def _inject_global_styles() -> None:
             border-top: 1px solid #eef2f7;
             padding-top: 8px;
             margin-top: 8px;
+        }
+        .rn-card-title {
+            color: var(--rn-ink);
+            font-size: 0.98rem;
+            font-weight: 760;
+            line-height: 1.35;
+            margin: 2px 0 4px;
+            overflow-wrap: anywhere;
+        }
+        .rn-card-preview {
+            color: #374151;
+            font-size: 0.9rem;
+            line-height: 1.45;
+            margin: 4px 0 6px;
+            overflow-wrap: anywhere;
         }
         .rn-mini-label {
             color: var(--rn-muted);
@@ -1224,6 +1242,115 @@ def _statement_option_label(statement: dict, max_chars: int = 86) -> str:
     return f"{statement_type} | {paper_id} | {preview} ({statement_id})"
 
 
+def _normalize_card_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _clip_card_text(value: object, max_chars: int = 180) -> str:
+    text = _normalize_card_text(value)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _result_type_label(result: dict) -> str:
+    return str(result.get("result_type", "result")).replace("_", " ").title()
+
+
+def _result_card_title(result: dict, max_chars: int = 132) -> str:
+    result_type = str(result.get("result_type", "result"))
+    raw_title = _normalize_card_text(result.get("title") or result.get("result_id") or "Result")
+    matched_text = _normalize_card_text(result.get("matched_text") or result.get("evidence_snippet"))
+
+    if result_type == "statement":
+        statement_type = str(result.get("statement_type") or "statement").replace("_", " ").title()
+        title_text = matched_text or "Statement preview unavailable"
+        return _clip_card_text(f"{statement_type}: {title_text}", max_chars)
+    if result_type == "gap":
+        return discovery_label(matched_text, fallback="Research gap", max_chars=max_chars)
+    if result_type == "hypothesis":
+        return discovery_label(matched_text, fallback="Hypothesis", max_chars=max_chars)
+    if result_type == "experiment_plan":
+        plan = result.get("experiment_plan", {}) or {}
+        objective = matched_text or _normalize_card_text(plan.get("objective"))
+        if objective:
+            return _clip_card_text(f"Experiment plan: {objective}", max_chars)
+        return "Experiment plan"
+    return _clip_card_text(raw_title, max_chars)
+
+
+def _result_card_preview(result: dict, title: str, max_chars: int = 240) -> str:
+    result_type = str(result.get("result_type", "result"))
+    if result_type in {"gap", "hypothesis"}:
+        preview = humanize_discovery_text(
+            str(result.get("matched_text") or ""),
+            fallback="",
+        )
+    elif result_type == "experiment_plan":
+        plan = result.get("experiment_plan", {}) or {}
+        method = _normalize_card_text(plan.get("method"))
+        baseline = _normalize_card_text(plan.get("baseline_or_control"))
+        metrics = plan.get("metrics", [])
+        metric_text = ", ".join(str(item) for item in metrics) if isinstance(metrics, list) else str(metrics or "")
+        parts = []
+        if method:
+            parts.append(f"Method: {method}")
+        if baseline:
+            parts.append(f"Control: {baseline}")
+        if metric_text:
+            parts.append(f"Metrics: {metric_text}")
+        preview = " | ".join(parts)
+    else:
+        preview = _normalize_card_text(result.get("evidence_snippet") or result.get("matched_text"))
+
+    preview = _clip_card_text(preview, max_chars)
+    title_text = _normalize_card_text(title)
+    if not preview or preview.lower() == title_text.lower() or title_text.lower().endswith(preview.lower()):
+        return ""
+    return preview
+
+
+def _evidence_status_label(statement_ids: list[str], data: dict) -> str:
+    if not statement_ids:
+        return ""
+    available_count = len(_available_statement_ids(statement_ids, data))
+    total_count = len(statement_ids)
+    if available_count == total_count:
+        return f"{total_count} linked"
+    if available_count > 0:
+        return f"{available_count}/{total_count} available"
+    return "IDs unavailable"
+
+
+def _result_metadata_tags(
+    result: dict,
+    data: dict,
+    evidence_statement_ids: list[str],
+) -> list[tuple[str, object, str]]:
+    result_type = str(result.get("result_type", "result"))
+    result_id = result.get("statement_id") or result.get("result_id") or result.get("linked_hypothesis_id")
+    score = result.get("score")
+    linked_id = result.get("linked_gap_id") or result.get("gap_id") or result.get("linked_hypothesis_id")
+    paper = result.get("paper_id")
+    indicator = result.get("safety_label") or ("grounded locally" if result_type != "paper" else "")
+    evidence_label = _evidence_status_label(evidence_statement_ids, data)
+    indicator_tone = "warn" if str(indicator).startswith("speculative") else "good"
+
+    return [
+        ("type", _result_type_label(result), ""),
+        ("score", score, ""),
+        ("id", result_id, ""),
+        ("paper", paper, ""),
+        ("evidence", evidence_label, "good" if evidence_label.endswith("linked") else "warn"),
+        ("linked", linked_id, ""),
+        ("status", indicator, indicator_tone),
+    ]
+
+
+def _discovery_body_text(record: dict, field: str, fallback: str) -> str:
+    return humanize_discovery_text(str(record.get(field, "")), fallback=fallback)
+
+
 def _select_evidence_statement(statement_id: str, source_label: str) -> None:
     st.session_state[SELECTED_EVIDENCE_KEY] = statement_id
     st.session_state[SELECTED_EVIDENCE_SOURCE_KEY] = source_label
@@ -1493,33 +1620,28 @@ def _result_card(result: dict, data: dict, card_index: int = 0) -> None:
         data.get("hypotheses", []),
         data.get("experiment_plans", []),
     )
-    indicator = result.get("safety_label") or "grounded locally"
+    result_title = _result_card_title(result)
+    preview = _result_card_preview(result, result_title)
+    evidence_statement_ids = _evidence_statement_ids_for_result(result, data)
     with st.container(border=True):
-        top_cols = st.columns([1, 4, 1])
-        top_cols[0].markdown(
+        st.markdown(
             f'<div class="rn-mini-label">{html.escape(str(result.get("result_type", "")).replace("_", " ").title())}</div>',
             unsafe_allow_html=True,
         )
-        top_cols[1].markdown(f"**{result.get('title', 'Result')}**")
-        top_cols[2].caption(f"score {result.get('score', 0)}")
-        st.write(result.get("matched_text") or result.get("evidence_snippet") or "No preview available.")
-        meta = {
-            "source": result.get("paper_id") or result.get("statement_id") or result.get("result_id"),
-            "evidence": result.get("evidence_statement_ids") or result.get("evidence_snippet", ""),
-            "linked_gap": result.get("linked_gap_id", ""),
-            "indicator": indicator,
-        }
         st.markdown(
-            '<div class="rn-result-meta">'
-            + html.escape(" | ".join(f"{key}: {value}" for key, value in meta.items() if value))
-            + "</div>",
+            f'<div class="rn-card-title">{html.escape(result_title)}</div>',
             unsafe_allow_html=True,
         )
+        if preview:
+            st.markdown(
+                f'<div class="rn-card-preview">{html.escape(preview)}</div>',
+                unsafe_allow_html=True,
+            )
+        _render_tag_list(_result_metadata_tags(result, data, evidence_statement_ids))
         result_type = result.get("result_type", "result")
-        result_title = result.get("title", result.get("result_id", ""))
         result_id = result.get("result_id", "")
         _render_evidence_action(
-            _evidence_statement_ids_for_result(result, data),
+            evidence_statement_ids,
             data,
             f"{result_type}: {result_title}",
             f"inspect-search-{card_index}-{result_type}-{result_id}",
@@ -1734,11 +1856,13 @@ def _sort_hypothesis_triage(hypotheses: list[dict], sort_by: str) -> list[dict]:
     )
 
 
-def _tag_value(value: object) -> str:
+def _tag_value(value: object, *, preserve_underscores: bool = False) -> str:
     if isinstance(value, list):
         return ", ".join(str(item) for item in value) or "none"
     if value is None or value == "":
         return "none"
+    if preserve_underscores:
+        return str(value)
     return str(value).replace("_", " ")
 
 
@@ -1747,9 +1871,10 @@ def _render_tag_list(tags: list[tuple[str, object, str]]) -> None:
     for label, value, tone in tags:
         if value is None or value == "" or value == []:
             continue
+        preserve_underscores = label in {"id", "linked", "paper", "safety", "status"}
         html_tags.append(
             f'<span class="rn-tag {html.escape(tone)}">'
-            f"{html.escape(label)}: {html.escape(_tag_value(value))}</span>"
+            f"{html.escape(label)}: {html.escape(_tag_value(value, preserve_underscores=preserve_underscores))}</span>"
         )
     if html_tags:
         st.markdown(f'<div class="rn-tag-list">{"".join(html_tags)}</div>', unsafe_allow_html=True)
@@ -1844,21 +1969,36 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
         if not filtered_gaps:
             st.info("No gaps match the current triage filters. Try broadening the search or lowering thresholds.")
         for gap in filtered_gaps:
+            gap_title = discovery_label(
+                str(gap.get("gap_text", "")),
+                fallback=str(gap.get("display_label") or gap.get("gap_id") or "Research gap"),
+                max_chars=132,
+            )
+            gap_body = _discovery_body_text(gap, "gap_text", "Research gap")
             with st.container(border=True):
                 st.markdown(
-                    f"<strong>Gap:</strong> {html.escape(str(gap.get('display_label', 'Research gap')))}",
+                    '<div class="rn-mini-label">Research gap</div>',
                     unsafe_allow_html=True,
                 )
-                st.caption(f"ID: {gap.get('gap_id')} | Score: {gap.get('rank_score')}")
+                st.markdown(
+                    f'<div class="rn-card-title">{html.escape(gap_title)}</div>',
+                    unsafe_allow_html=True,
+                )
+                if gap_body and _normalize_card_text(gap_body).lower() != _normalize_card_text(gap_title).lower():
+                    st.markdown(
+                        f'<div class="rn-card-preview">{html.escape(gap_body)}</div>',
+                        unsafe_allow_html=True,
+                    )
                 _render_tag_list(
                     [
+                        ("id", gap.get("gap_id"), ""),
+                        ("score", gap.get("rank_score"), ""),
                         ("type", gap.get("gap_type", "unknown"), ""),
                         ("evidence", gap.get("evidence_count", 0), "good"),
                         ("papers", gap.get("paper_count", 0), "good"),
                         ("status", gap.get("evidence_status", ""), "warn" if gap.get("evidence_status") != "evidence-linked" else "good"),
                     ]
                 )
-                st.write(gap.get("gap_text"))
                 st.caption(f"Score inputs: {gap.get('rank_score_explanation')}")
                 _render_evidence_warning(gap, "gap")
                 _render_evidence_action(
@@ -1932,16 +2072,35 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
         st.info("No hypotheses match the current triage filters. Try broadening the search or lowering thresholds.")
     for hypothesis in filtered_hypotheses:
         hypothesis_id = str(hypothesis.get("hypothesis_id", ""))
+        hypothesis_title = discovery_label(
+            str(hypothesis.get("hypothesis_text", "")),
+            fallback=str(hypothesis.get("display_label") or hypothesis_id or "Hypothesis"),
+            max_chars=132,
+        )
+        hypothesis_body = _discovery_body_text(hypothesis, "hypothesis_text", "Speculative hypothesis")
         with st.container(border=True):
             st.markdown(
-                f"<strong>Hypothesis:</strong> {html.escape(str(hypothesis.get('display_label', 'Hypothesis')))}",
+                '<div class="rn-mini-label">Speculative hypothesis</div>',
                 unsafe_allow_html=True,
             )
-            st.caption(f"ID: {hypothesis_id} | Triage score: {hypothesis.get('triage_score')}")
+            st.markdown(
+                f'<div class="rn-card-title">{html.escape(hypothesis_title)}</div>',
+                unsafe_allow_html=True,
+            )
+            if (
+                hypothesis_body
+                and _normalize_card_text(hypothesis_body).lower() != _normalize_card_text(hypothesis_title).lower()
+            ):
+                st.markdown(
+                    f'<div class="rn-card-preview">{html.escape(hypothesis_body)}</div>',
+                    unsafe_allow_html=True,
+                )
             _render_tag_list(
                 [
+                    ("id", hypothesis_id, ""),
+                    ("triage", hypothesis.get("triage_score"), ""),
                     ("confidence", hypothesis.get("confidence_level", "unknown"), ""),
-                    ("safety", hypothesis.get("safety_label", ""), "good"),
+                    ("safety", hypothesis.get("safety_label", ""), "warn"),
                     ("evidence", hypothesis.get("evidence_count", 0), "good"),
                     ("papers", hypothesis.get("paper_count", 0), "good"),
                     (
@@ -1951,10 +2110,9 @@ def _render_discoveries_tab(data: dict, counts: dict) -> None:
                     ),
                 ]
             )
-            st.write(hypothesis.get("hypothesis_text"))
             st.caption(
-                f"Linked gap: {hypothesis.get('gap_id')} | "
-                f"{hypothesis.get('linked_gap_label', '')}"
+                f"Linked gap: {hypothesis.get('linked_gap_label', '')} "
+                f"({hypothesis.get('gap_id')})"
             )
             st.caption(f"Score inputs: {hypothesis.get('triage_score_explanation')}")
             _render_evidence_warning(hypothesis, "hypothesis")

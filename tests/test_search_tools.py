@@ -7,8 +7,10 @@ from ui.data_access import (
     build_ingestion_status,
     build_research_themes,
     create_research_brief,
+    discovery_label,
     evidence_for_statement_ids,
     get_related_items,
+    humanize_discovery_text,
     load_processed_data,
     prepare_hypothesis_triage,
     rank_gaps,
@@ -83,6 +85,23 @@ def test_empty_query_returns_no_misleading_results():
     assert search_statements("", sample_statements()) == []
     assert search_gaps("", [{"gap_id": "gap_001"}]) == []
     assert search_hypotheses("", [{"hypothesis_id": "hyp_001"}]) == []
+
+
+def test_discovery_text_helpers_remove_generated_boilerplate():
+    text = (
+        "A possible research gap is suggested by a reported limitation: "
+        "Evaluation remains narrow for small corpora."
+    )
+    hypothesis_text = (
+        "A testable hypothesis could be that targeted evaluation of gap gap_123abc "
+        "will clarify the limitation."
+    )
+
+    assert humanize_discovery_text(text) == "Evaluation remains narrow for small corpora."
+    assert discovery_label(text, max_chars=32) == "Evaluation remains narrow for..."
+    assert humanize_discovery_text(hypothesis_text) == (
+        "Targeted evaluation of the linked gap will clarify the limitation."
+    )
 
 
 def test_related_gaps_and_hypotheses_are_found_by_evidence_ids():

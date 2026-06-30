@@ -17,6 +17,9 @@ from ui.streamlit_app import (
     _load_ui_settings,
     _render_dataframe,
     _render_plotly_chart,
+    _result_card_preview,
+    _result_card_title,
+    _result_metadata_tags,
     _sort_gap_triage,
     _sort_hypothesis_triage,
     _statement_option_label,
@@ -457,6 +460,78 @@ def test_evidence_statement_ids_for_result_prefers_direct_and_related_ids():
     assert _evidence_statement_ids_for_result(statement_result, data) == ["stmt_direct"]
     assert _evidence_statement_ids_for_result(plan_result, data) == ["stmt_hyp"]
     assert _available_statement_ids(["stmt_hyp", "missing"], data) == ["stmt_hyp"]
+
+
+def test_result_card_title_prefers_research_text_over_internal_ids():
+    statement_result = {
+        "result_type": "statement",
+        "result_id": "stmt_001",
+        "statement_type": "limitation",
+        "title": "limitation: stmt_001",
+        "matched_text": "Evaluation uses a narrow dataset.",
+    }
+    gap_result = {
+        "result_type": "gap",
+        "result_id": "gap_001",
+        "title": "gap_001",
+        "matched_text": (
+            "A possible research gap is suggested by a reported limitation: "
+            "Cross-paper validation remains narrow."
+        ),
+    }
+    hypothesis_result = {
+        "result_type": "hypothesis",
+        "result_id": "hyp_001",
+        "title": "hyp_001",
+        "matched_text": "A testable hypothesis could be that controlled evaluation clarifies the gap.",
+    }
+
+    assert _result_card_title(statement_result) == "Limitation: Evaluation uses a narrow dataset."
+    assert _result_card_title(gap_result) == "Cross-paper validation remains narrow."
+    assert _result_card_title(hypothesis_result) == "Controlled evaluation clarifies the gap."
+    assert "stmt_001" not in _result_card_title(statement_result)
+    assert "gap_001" not in _result_card_title(gap_result)
+    assert "hyp_001" not in _result_card_title(hypothesis_result)
+
+
+def test_result_card_metadata_keeps_ids_and_evidence_secondary():
+    result = {
+        "result_type": "hypothesis",
+        "result_id": "hyp_001",
+        "linked_gap_id": "gap_001",
+        "evidence_statement_ids": ["stmt_001", "stmt_missing"],
+        "score": 17,
+        "safety_label": "speculative_research_hypothesis",
+    }
+    data = {"statements": [{"statement_id": "stmt_001"}]}
+
+    tags = _result_metadata_tags(result, data, ["stmt_001", "stmt_missing"])
+    tag_values = {(label, value) for label, value, _tone in tags}
+
+    assert ("id", "hyp_001") in tag_values
+    assert ("linked", "gap_001") in tag_values
+    assert ("evidence", "1/2 available") in tag_values
+    assert ("status", "speculative_research_hypothesis") in tag_values
+
+
+def test_result_card_preview_avoids_repeating_the_title_but_shows_plan_details():
+    repeated_gap = {
+        "result_type": "gap",
+        "matched_text": "A possible research gap is suggested by: Evaluation remains narrow.",
+    }
+    plan_result = {
+        "result_type": "experiment_plan",
+        "matched_text": "Evaluate controlled benchmarks.",
+        "experiment_plan": {
+            "method": "Compare the local method against a baseline.",
+            "metrics": ["coverage", "robustness"],
+        },
+    }
+
+    assert _result_card_preview(repeated_gap, "Evaluation remains narrow.") == ""
+    assert _result_card_preview(plan_result, _result_card_title(plan_result)) == (
+        "Method: Compare the local method against a baseline. | Metrics: coverage, robustness"
+    )
 
 
 def test_statement_option_label_includes_type_paper_preview_and_id():
