@@ -23,6 +23,8 @@ from app.schemas import (
     StatementRecord,
 )
 from scripts.project_stats import calculate_project_stats
+from scripts.check_no_secrets import scan_for_secrets
+from scripts.export_agent_trace import validate_agent_trace
 from tools.config_tools import load_config
 from tools.logging_tools import log_error, log_info
 from tools.storage_tools import get_chunks, get_papers, get_statements
@@ -46,6 +48,8 @@ REQUIRED_PROJECT_FILES = [
     "scripts/build_graph.py",
     "scripts/discover_gaps.py",
     "scripts/evaluate_outputs.py",
+    "scripts/check_no_secrets.py",
+    "scripts/export_agent_trace.py",
     "scripts/validate_submission.py",
     "ui/streamlit_app.py",
     "app/agent.py",
@@ -62,6 +66,10 @@ PROCESSED_ARTIFACTS = [
     "data/processed/research_graph.graphml",
     "data/processed/gaps_and_hypotheses.json",
     "data/processed/evaluation_report.json",
+]
+
+GENERATED_ARTIFACTS = [
+    "data/generated/agent_trace_demo.json",
 ]
 
 
@@ -95,6 +103,9 @@ def run_preflight(
     checks.extend(_check_config(root))
     checks.extend(_check_papers_dir(root))
     checks.extend(_check_processed_artifacts(root, require_artifacts, processed_artifacts))
+    checks.extend(_check_generated_artifacts(root, GENERATED_ARTIFACTS))
+    checks.extend(_check_agent_trace(root / "data" / "generated" / "agent_trace_demo.json"))
+    checks.extend(_check_no_secrets(root))
 
     failed = [check for check in checks if check["status"] == "fail"]
     if not failed:
@@ -217,6 +228,53 @@ def _check_processed_artifacts(
             )
         )
     return checks
+
+
+def _check_generated_artifacts(root: Path, generated_artifacts: Iterable[str]) -> list[dict[str, str]]:
+    checks = []
+    for relative_path in sorted(set(generated_artifacts)):
+        file_path = root / relative_path
+        exists = file_path.exists() and file_path.stat().st_size > 0
+        checks.append(
+            _result(
+                "generated_artifact",
+                relative_path,
+                "pass" if exists else "warn",
+                "Generated artifact exists." if exists else "Run `uv run python -m scripts.export_agent_trace`.",
+            )
+        )
+    return checks
+
+
+def _check_agent_trace(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [_result("agent_trace", str(path), "fail", f"Trace JSON invalid: {exc}")]
+    errors = validate_agent_trace(payload)
+    return [
+        _result(
+            "agent_trace",
+            str(path),
+            "pass" if not errors else "fail",
+            "Deterministic agent trace is valid." if not errors else "; ".join(errors),
+        )
+    ]
+
+
+def _check_no_secrets(root: Path) -> list[dict[str, str]]:
+    report = scan_for_secrets(root)
+    findings = int(report["summary"]["findings"])
+    return [
+        _result(
+            "security",
+            "no_secrets_scan",
+            "pass" if findings == 0 else "fail",
+            f"No-secrets scan findings: {findings}.",
+        )
+    ]
 
 
 def _check_existing_outputs(root: Path, processed_artifacts: Iterable[str]) -> list[dict[str, str]]:

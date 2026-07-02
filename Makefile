@@ -1,4 +1,4 @@
-.PHONY: audit coverage demo eval validate preflight samples lint lint-style typecheck ci test ui stats brief mcp
+.PHONY: audit coverage demo eval validate preflight samples trace secrets lint lint-style typecheck ci test ui stats brief mcp
 
 audit:
 	uv run python -m scripts.dependency_audit
@@ -20,6 +20,12 @@ preflight:
 
 samples:
 	uv run python -m scripts.generate_sample_outputs
+
+trace:
+	uv run python -m scripts.export_agent_trace
+
+secrets:
+	uv run python -m scripts.check_no_secrets
 
 lint:
 	uv run ruff check . --select F

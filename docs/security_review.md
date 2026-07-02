@@ -1,6 +1,6 @@
 # Security Review
 
-This document summarizes the security posture of ResearchNavigator Agent for the local deterministic MVP.
+This document summarizes the security posture of ResearchNavigator Agent for the deterministic local baseline.
 
 ## Scope
 
@@ -15,9 +15,9 @@ The review covers:
 - Streamlit dashboard
 - policy checks
 - evaluation and validation scripts
-- ADK-facing prototype wrapper
+- ADK-facing local wrapper
 
-The MVP does not include cloud deployment, external web search, model training, fine-tuning, email sending, or production credentials.
+The local baseline does not include cloud deployment, external web search, model training, fine-tuning, email sending, or production credentials.
 
 ## Security Goals
 
@@ -27,7 +27,7 @@ The MVP does not include cloud deployment, external web search, model training, 
 - Prevent prompt-injected paper text from becoming agent instructions.
 - Avoid invented citations and unsupported claims.
 - Keep hypotheses clearly speculative.
-- Block external or high-risk tool actions in the local MVP.
+- Block external or high-risk tool actions in the local baseline.
 - Detect and sanitize sensitive context in proposed tool arguments.
 
 ## Threat Model
@@ -55,7 +55,7 @@ The MVP does not include cloud deployment, external web search, model training, 
 
 ## Blocked By Default
 
-The local MVP policy blocks:
+The local baseline policy blocks:
 
 - `send_email`
 - `deploy_cloud`
@@ -69,14 +69,14 @@ The local MVP policy blocks:
 - Input PDFs live under `data/papers/`.
 - Processed artifacts live under `data/processed/`.
 - The dashboard reads local files only.
-- The deterministic MVP does not send papers, statements, or outputs to remote services.
+- The deterministic local baseline does not send papers, statements, or outputs to remote services.
 
 ## Residual Risks
 
 - Rule-based extraction can miss nuanced claims.
 - Prompt-injection detection is pattern-based, not exhaustive.
 - Citation support is statement-ID based, not full bibliographic verification.
-- The ADK wrapper is prototype-only and should not be deployed without additional review.
+- The ADK wrapper is designed for local review and should not be deployed publicly without additional review.
 - Streamlit is intended for local review, not public hosting.
 
 ## Review Checklist Before Submission

@@ -46,7 +46,7 @@ The server remains local-first:
 
 ## Suggested Demo
 
-In the video, briefly show:
+In the demo walkthrough, briefly show:
 
 ```bash
 uv run python -c "from app.mcp_server import mcp_tool_manifest; print(mcp_tool_manifest())"

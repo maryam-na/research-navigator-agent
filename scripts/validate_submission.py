@@ -11,13 +11,14 @@ from urllib.parse import urlparse
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.check_no_secrets import scan_for_secrets
+from scripts.export_agent_trace import validate_agent_trace
 from scripts.project_stats import calculate_project_stats
 from tools.config_tools import load_config
 from tools.logging_tools import log_error, log_info
 
 REQUIRED_FILES = [
     "README.md",
-    "SUBMISSION.md",
     "CHANGELOG.md",
     "configs/default.yaml",
     "SKILL.md",
@@ -29,16 +30,10 @@ REQUIRED_FILES = [
     "specs/behavior_scenarios.md",
     "specs/policies.yaml",
     "evals/golden_cases.json",
-    "docs/kaggle_submission_package.md",
-    "docs/kaggle_video_script.md",
-    "docs/capstone_evaluation_mapping.md",
     "docs/agent_technology_story.md",
     "docs/mcp_server.md",
-    "docs/antigravity_demo_notes.md",
-    "docs/demo_script.md",
     "docs/system_card.md",
     "docs/reproducibility.md",
-    "docs/judge_walkthrough.md",
     "docs/security_review.md",
     "docs/dependency_audit.md",
     "docs/coverage_report.md",
@@ -51,7 +46,9 @@ REQUIRED_FILES = [
     "app/schemas/discovery.py",
     "app/schemas/evaluation.py",
     "scripts/coverage_report.py",
+    "scripts/check_no_secrets.py",
     "scripts/dependency_audit.py",
+    "scripts/export_agent_trace.py",
     "scripts/preflight.py",
     "scripts/run_mcp_server.py",
     "ui/streamlit_app.py",
@@ -69,6 +66,10 @@ PROCESSED_FILES = [
     "data/processed/evaluation_report.json",
     "data/processed/golden_eval_report.json",
     "data/processed/researchnavigator_brief.md",
+]
+
+GENERATED_FILES = [
+    "data/generated/agent_trace_demo.json",
 ]
 
 SCREENSHOT_FILES = [
@@ -111,6 +112,9 @@ def validate_submission(
     checks.extend(_check_required_files(root))
     checks.extend(_check_config(root))
     checks.extend(_check_processed_files(root))
+    checks.extend(_check_generated_files(root))
+    checks.extend(_check_agent_trace(root))
+    checks.extend(_check_no_secrets(root))
     checks.extend(_check_screenshot_files(root))
     checks.extend(_check_sample_output_files(root))
     checks.extend(_check_paper_manifest(root))
@@ -145,7 +149,6 @@ def _check_required_files(root: Path) -> list[dict]:
         for path in REQUIRED_FILES
     ]
 
-
 def _check_config(root: Path) -> list[dict]:
     config_path = root / "configs" / "default.yaml"
     if not config_path.exists():
@@ -178,6 +181,54 @@ def _check_processed_files(root: Path) -> list[dict]:
             )
         )
     return checks
+
+
+def _check_generated_files(root: Path) -> list[dict]:
+    checks = []
+    for path in GENERATED_FILES:
+        file_path = root / path
+        exists = file_path.exists() and file_path.stat().st_size > 0
+        checks.append(
+            _result(
+                "generated_artifact",
+                path,
+                "pass" if exists else "fail",
+                "Generated artifact exists." if exists else "Run `uv run python -m scripts.export_agent_trace`.",
+            )
+        )
+    return checks
+
+
+def _check_agent_trace(root: Path) -> list[dict]:
+    path = root / "data" / "generated" / "agent_trace_demo.json"
+    if not path.exists():
+        return [_result("agent_trace", str(path), "fail", "Deterministic agent trace is missing.")]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [_result("agent_trace", str(path), "fail", f"Trace JSON invalid: {exc}")]
+    errors = validate_agent_trace(payload)
+    return [
+        _result(
+            "agent_trace",
+            "data/generated/agent_trace_demo.json",
+            "pass" if not errors else "fail",
+            "Deterministic agent trace is valid." if not errors else "; ".join(errors),
+        )
+    ]
+
+
+def _check_no_secrets(root: Path) -> list[dict]:
+    report = scan_for_secrets(root)
+    findings = int(report["summary"]["findings"])
+    return [
+        _result(
+            "security",
+            "no_secrets_scan",
+            "pass" if findings == 0 else "fail",
+            f"No-secrets scan findings: {findings}.",
+        )
+    ]
 
 
 def _check_screenshot_files(root: Path) -> list[dict]:
@@ -313,11 +364,16 @@ def _check_project_stats(root: Path) -> list[dict]:
 def _check_docs_content(root: Path) -> list[dict]:
     readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").exists() else ""
     required_phrases = [
-        "Competition Demo",
+        "Project Summary",
+        "Why This Is An Agent",
+        "Capstone Evaluation Coverage",
+        "Quickstart",
         "Architecture",
-        "ADK Prototype Entry Point",
-        "capstone_evaluation_mapping.md",
-        "Known Limitations",
+        "Security And Privacy",
+        "Demo Workflow",
+        "Demo Screenshots",
+        "Repository Map",
+        "Agent And MCP Commands",
     ]
     checks = []
     for phrase in required_phrases:

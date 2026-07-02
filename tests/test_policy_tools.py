@@ -33,7 +33,7 @@ def test_tool_policy_enforces_role_allowlist():
 
 
 def test_sensitive_context_detection_and_sanitization():
-    text = "Contact maryam@example.com with api_key=abcdef1234567890 and http://127.0.0.1:8501."
+    text = "Contact maryam@example.com with api_key=example_placeholder_value and http://127.0.0.1:8501."
 
     detected = detect_sensitive_context(text)
     sanitized = sanitize_context_text(text)

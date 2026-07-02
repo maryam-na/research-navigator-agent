@@ -64,6 +64,7 @@ DEFAULT_GRAPH_PATH = Path("data/processed/research_graph.graphml")
 DEFAULT_DISCOVERY_PATH = Path("data/processed/gaps_and_hypotheses.json")
 DEFAULT_EVALUATION_PATH = Path("data/processed/evaluation_report.json")
 DEFAULT_BRIEF_PATH = Path("data/processed/researchnavigator_brief.md")
+DEFAULT_AGENT_TRACE_PATH = Path("data/generated/agent_trace_demo.json")
 FALLBACK_DEFAULT_SEARCH_QUERY = "limitations evaluation dataset"
 FALLBACK_MAX_SEARCH_RESULTS = 30
 SEARCH_PAGE_SIZE_OPTIONS = [6, 10, 15, 30]
@@ -86,6 +87,7 @@ BRIEF_ARTIFACT_COMMAND = (
     "uv run python -m scripts.run_demo --brief-path "
     "data/processed/researchnavigator_brief.md"
 )
+AGENT_TRACE_COMMAND = "uv run python -m scripts.export_agent_trace"
 ARTIFACT_SPECS = [
     {
         "key": "database",
@@ -120,6 +122,13 @@ ARTIFACT_SPECS = [
         "path": DEFAULT_BRIEF_PATH,
         "depends_on": [DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH],
         "recovery_step": BRIEF_ARTIFACT_COMMAND,
+    },
+    {
+        "key": "agent_trace",
+        "label": "Deterministic agent trace",
+        "path": DEFAULT_AGENT_TRACE_PATH,
+        "depends_on": [DEFAULT_DISCOVERY_PATH, DEFAULT_EVALUATION_PATH],
+        "recovery_step": AGENT_TRACE_COMMAND,
     },
 ]
 GRAPH_NODE_TYPE_STYLES = {
@@ -247,6 +256,39 @@ def _inject_global_styles() -> None:
         }
         div[data-testid="stTabs"] button[aria-selected="true"] {
             color: var(--rn-blue);
+        }
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p {
+            color: var(--rn-blue);
+        }
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+            border-bottom-color: var(--rn-blue);
+        }
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]::before,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"]::after {
+            background: var(--rn-blue) !important;
+            border-color: var(--rn-blue) !important;
+        }
+        div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"],
+        div[data-testid="stSlider"] div[data-baseweb="slider"] div[style*="rgb(255, 75, 75)"],
+        div[data-testid="stSlider"] div[data-baseweb="slider"] div[style*="#ff4b4b"],
+        div[data-testid="stSlider"] div[data-baseweb="slider"] div[style*="#ff2b2b"] {
+            background: var(--rn-blue) !important;
+            border-color: var(--rn-blue) !important;
+            color: var(--rn-blue) !important;
+        }
+        div[data-baseweb="select"] span[data-baseweb="tag"],
+        div[data-baseweb="select"] div[data-baseweb="tag"] {
+            background: #eff6ff !important;
+            border: 1px solid #bfdbfe !important;
+            color: var(--rn-blue) !important;
+        }
+        div[data-baseweb="select"] span[data-baseweb="tag"] span,
+        div[data-baseweb="select"] div[data-baseweb="tag"] span,
+        div[data-baseweb="select"] span[data-baseweb="tag"] svg,
+        div[data-baseweb="select"] div[data-baseweb="tag"] svg {
+            color: var(--rn-blue) !important;
+            fill: currentColor !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"] {
             border-color: var(--rn-line);
@@ -819,7 +861,7 @@ def _render_header(counts: dict, evaluation: dict) -> None:
             <div>
               <div class="rn-kicker">Local research workspace</div>
               <div class="rn-title">ResearchNavigator Agent</div>
-              <p class="rn-subtitle">Local, grounded research discovery for small scientific paper collections.</p>
+              <p class="rn-subtitle">Capstone demo: local, privacy-preserving research discovery with evidence-linked agent tools.</p>
               <div class="rn-pill-row">
                 <span class="rn-pill good">Local-first</span>
                 <span class="rn-pill good">Google ADK-facing</span>
@@ -3061,8 +3103,14 @@ def _render_static_graph_svg(graph: nx.DiGraph, label_mode: str = "Key labels") 
         color = _graph_node_color(node_type)
         radius = max(5, min(9, _graph_node_size(node_type) / 1.5))
         label = html.escape(_graph_node_text_label(str(node_id), dict(attrs), label_mode, labeled_node_ids))
+        if x > width * 0.72:
+            text_x = x - radius - 5
+            text_anchor = "end"
+        else:
+            text_x = x + radius + 5
+            text_anchor = "start"
         text_markup = (
-            f'<text x="{x + radius + 4:.1f}" y="{y + 4:.1f}">{label}</text>'
+            f'<text x="{text_x:.1f}" y="{y + 4:.1f}" text-anchor="{text_anchor}">{label}</text>'
             if label
             else ""
         )
@@ -3446,11 +3494,15 @@ def main() -> None:
         agent_story = describe_agent_capabilities()
         trajectory = planned_tool_trajectory()
         _section_header("ADK agent view", "Local Google ADK-facing wrapper over deterministic research tools.", "Agent")
-        story_cols = st.columns(4)
-        story_cols[0].metric("Agent", agent_story["agent_name"])
-        story_cols[1].metric("Framework", agent_story["agent_framework"])
-        story_cols[2].metric("Callable tools", agent_story["tool_count"])
-        story_cols[3].metric("Mode", agent_story["mode"])
+        _metric_cards(
+            [
+                ("Agent", agent_story["agent_name"]),
+                ("Framework", agent_story["agent_framework"]),
+                ("Callable tools", agent_story["tool_count"]),
+                ("Mode", agent_story["mode"]),
+            ],
+            columns=4,
+        )
         st.caption(agent_story["orchestration_pattern"])
         with st.expander("Agent instruction and safety boundaries", expanded=True):
             st.write(agent_story["model_policy"])
@@ -3488,6 +3540,40 @@ def main() -> None:
         st.caption(trajectory["why_this_is_agentic"])
         _render_dataframe(pd.DataFrame({"policy_gate": trajectory["policy_gates"]}))
         st.caption("Final answer contract: " + " | ".join(trajectory["final_answer_contract"]))
+
+        _section_header(
+            "Deterministic trace artifact",
+            "Exported JSON trajectory for the capstone video and reproducibility checks.",
+            "Trace",
+        )
+        agent_trace = load_json_file(DEFAULT_AGENT_TRACE_PATH)
+        if agent_trace:
+            trace_steps = list(agent_trace.get("steps", []) or [])
+            _metric_cards(
+                [
+                    ("Trace ID", agent_trace.get("trace_id", "n/a")),
+                    ("Trace steps", len(trace_steps)),
+                    ("Mode", agent_trace.get("mode", "n/a")),
+                ],
+                columns=3,
+            )
+            _render_dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "order": step.get("order", ""),
+                            "step_type": step.get("step_type", ""),
+                            "tool_name": step.get("tool_name", ""),
+                            "safety_gate": step.get("safety_gate", ""),
+                            "output_summary": step.get("output_summary", ""),
+                        }
+                        for step in trace_steps
+                    ]
+                )
+            )
+        else:
+            st.info("No deterministic trace artifact found yet. Run the local export command below.")
+        st.code(AGENT_TRACE_COMMAND, language="bash")
 
         mcp_manifest = mcp_tool_manifest()
         _section_header(
@@ -3540,12 +3626,16 @@ def main() -> None:
                         DEFAULT_DISCOVERY_PATH,
                         DEFAULT_EVALUATION_PATH,
                         DEFAULT_BRIEF_PATH,
+                        DEFAULT_AGENT_TRACE_PATH,
                     ]
                 )
             )
         _render_pipeline_run_control("pipeline")
         with st.expander("Full local command reference", expanded=False):
-            st.code("\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND]), language="bash")
+            st.code(
+                "\n".join([*PIPELINE_COMMANDS, BRIEF_ARTIFACT_COMMAND, AGENT_TRACE_COMMAND]),
+                language="bash",
+            )
         with st.expander("Raw backend tables"):
             _render_dataframe(data["papers"])
             _render_dataframe(data["statements"])

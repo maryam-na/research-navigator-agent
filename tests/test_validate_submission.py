@@ -4,9 +4,79 @@ from pathlib import Path
 from scripts.validate_submission import REQUIRED_FILES, validate_submission
 
 
+README_SECTIONS = (
+    "Project Summary\n"
+    "Why This Is An Agent\n"
+    "Capstone Evaluation Coverage\n"
+    "Quickstart\n"
+    "Architecture\n"
+    "Security And Privacy\n"
+    "Demo Workflow\n"
+    "Demo Screenshots\n"
+    "Repository Map\n"
+    "Agent And MCP Commands\n"
+)
+
+
 def write_json(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_valid_agent_trace(root: Path) -> None:
+    write_json(
+        root / "data/generated/agent_trace_demo.json",
+        {
+            "steps": [
+                {
+                    "step_type": "planning",
+                    "tool_name": "planned_tool_trajectory",
+                    "purpose": "Plan.",
+                    "input_summary": "Question.",
+                    "output_summary": "Plan.",
+                },
+                {
+                    "step_type": "ingestion",
+                    "tool_name": "ingest_local_papers",
+                    "purpose": "Ingest.",
+                    "input_summary": "PDFs.",
+                    "output_summary": "Statements.",
+                },
+                {
+                    "step_type": "retrieval",
+                    "tool_name": "search_local_corpus",
+                    "purpose": "Search.",
+                    "input_summary": "Query.",
+                    "output_summary": "stmt_001.",
+                },
+                {
+                    "step_type": "grounding",
+                    "tool_name": "inspect_evidence",
+                    "purpose": "Inspect.",
+                    "input_summary": "stmt_001.",
+                    "output_summary": "Evidence.",
+                },
+                {
+                    "step_type": "safety_check",
+                    "tool_name": "evaluate_local_outputs",
+                    "purpose": "Evaluate.",
+                    "input_summary": "Outputs.",
+                    "output_summary": "Safe enough for review.",
+                },
+                {
+                    "step_type": "final_answer",
+                    "tool_name": "compose_grounded_answer",
+                    "purpose": "Answer.",
+                    "input_summary": "Evidence.",
+                    "output_summary": "Answer references stmt_001.",
+                },
+            ],
+            "final_answer": {
+                "text": "Grounded answer references stmt_001.",
+                "evidence_ids": ["stmt_001"],
+            },
+        },
+    )
 
 
 def test_validate_submission_flags_missing_project_files(tmp_path):
@@ -23,10 +93,7 @@ def test_validate_submission_checks_manifest_mismatch(tmp_path, monkeypatch):
         if required == "configs/default.yaml":
             path.write_text(Path(required).read_text(encoding="utf-8"), encoding="utf-8")
         else:
-            path.write_text(
-                "Competition Demo\nArchitecture\nADK Prototype Entry Point\nKnown Limitations\n",
-                encoding="utf-8",
-            )
+            path.write_text(README_SECTIONS, encoding="utf-8")
     papers_dir = tmp_path / "data" / "papers"
     papers_dir.mkdir(parents=True)
     for index in range(5):
@@ -52,6 +119,7 @@ def test_validate_submission_checks_manifest_mismatch(tmp_path, monkeypatch):
         tmp_path / "data/processed/golden_eval_report.json",
         {"pass_rate": 1.0, "failed_cases": 0},
     )
+    write_valid_agent_trace(tmp_path)
     monkeypatch.setattr(
         "scripts.validate_submission.calculate_project_stats",
         lambda db_path: {"papers": 5, "statements": 10, "graph_nodes": 20},
@@ -73,10 +141,7 @@ def test_validate_submission_passes_complete_fixture(tmp_path, monkeypatch):
         if required == "configs/default.yaml":
             path.write_text(Path(required).read_text(encoding="utf-8"), encoding="utf-8")
         else:
-            path.write_text(
-                "Competition Demo\nArchitecture\nADK Prototype Entry Point\nKnown Limitations\n",
-                encoding="utf-8",
-            )
+            path.write_text(README_SECTIONS, encoding="utf-8")
     papers_dir = tmp_path / "data" / "papers"
     papers_dir.mkdir(parents=True)
     manifest_papers = []
@@ -102,6 +167,7 @@ def test_validate_submission_passes_complete_fixture(tmp_path, monkeypatch):
         tmp_path / "data/processed/golden_eval_report.json",
         {"pass_rate": 1.0, "failed_cases": 0},
     )
+    write_valid_agent_trace(tmp_path)
     monkeypatch.setattr(
         "scripts.validate_submission.calculate_project_stats",
         lambda db_path: {"papers": 5, "statements": 10, "graph_nodes": 20},

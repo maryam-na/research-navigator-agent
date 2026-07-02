@@ -1,0 +1,112 @@
+{
+  "agent_framing": "ADK-facing tool-orchestrating research discovery agent",
+  "evidence_preview": [
+    {
+      "paper_id": "paper-01",
+      "snippet": "This limitation is not primarily due to the omission of particular operators, since additional functions can often be incorporated into the library.",
+      "statement_id": "stmt_1da2a6251f9b",
+      "statement_type": "limitation"
+    },
+    {
+      "paper_id": "paper-01",
+      "snippet": "Expanding the candidate library is a possible solution, but it cannot guarantee completeness and adds complexity to the sparse identification process.",
+      "statement_id": "stmt_e4560ca6d889",
+      "statement_type": "limitation"
+    }
+  ],
+  "final_answer": {
+    "evidence_ids": [
+      "stmt_1da2a6251f9b",
+      "stmt_e4560ca6d889"
+    ],
+    "safety_labels": [
+      "grounded",
+      "speculative_research_hypothesis",
+      "human_review_required"
+    ],
+    "text": "For the question 'Which research gaps in the local corpus are supported by evidence IDs?', the local corpus supports a bounded research gap (gap_638445052af4) using evidence IDs stmt_1da2a6251f9b, stmt_e4560ca6d889. A candidate hypothesis (hyp_58460568add6) is speculative, not proven, and should be reviewed by a human before use beyond the demo."
+  },
+  "limits": [
+    "Uses only local processed artifacts.",
+    "Does not train or fine-tune models.",
+    "Does not call external APIs.",
+    "Generated hypotheses are speculative and require human review."
+  ],
+  "mode": "local_offline_deterministic_baseline",
+  "steps": [
+    {
+      "input_summary": "User question: Which research gaps in the local corpus are supported by evidence IDs?",
+      "order": 1,
+      "output_summary": "Plan: ingest, extract, retrieve evidence, build graph, discover gaps, evaluate, then answer with evidence IDs.",
+      "purpose": "Plan the local research-discovery tool path before answering.",
+      "safety_gate": "policy_gates_visible",
+      "step_type": "planning",
+      "tool_name": "planned_tool_trajectory"
+    },
+    {
+      "input_summary": "Local PDF corpus in data/papers; no external browsing or API keys.",
+      "order": 2,
+      "output_summary": "Structured local statements available: 459.",
+      "purpose": "Load permitted local PDFs and convert them into SQLite records.",
+      "safety_gate": "prompt_injection_treated_as_data",
+      "step_type": "ingestion",
+      "tool_name": "ingest_local_papers"
+    },
+    {
+      "input_summary": "Search processed papers, statements, gaps, hypotheses, and plans.",
+      "order": 3,
+      "output_summary": "Selected evidence IDs: stmt_1da2a6251f9b, stmt_e4560ca6d889.",
+      "purpose": "Retrieve local statements relevant to the research question.",
+      "safety_gate": "local_processed_artifacts_only",
+      "step_type": "retrieval",
+      "tool_name": "search_local_corpus"
+    },
+    {
+      "input_summary": "Evidence IDs requested: stmt_1da2a6251f9b, stmt_e4560ca6d889.",
+      "order": 4,
+      "output_summary": "Evidence rows inspected: 2.",
+      "purpose": "Inspect source statement metadata before using evidence in an answer.",
+      "safety_gate": "evidence_id_traceability",
+      "step_type": "grounding",
+      "tool_name": "inspect_evidence"
+    },
+    {
+      "input_summary": "SQLite statements and local graph artifact path.",
+      "order": 5,
+      "output_summary": "Graph supports relationship review before gap discovery.",
+      "purpose": "Represent local papers and extracted statements as a NetworkX graph.",
+      "safety_gate": "graph_size_checked",
+      "step_type": "graph_discovery",
+      "tool_name": "build_local_graph"
+    },
+    {
+      "input_summary": "Grounded statements and graph relationships from the local corpus.",
+      "order": 6,
+      "output_summary": "Generated gap gap_638445052af4 and hypothesis hyp_58460568add6 with safety label speculative_research_hypothesis.",
+      "purpose": "Generate evidence-backed gaps and speculative hypotheses from local statements.",
+      "safety_gate": "evidence_required",
+      "step_type": "gap_and_hypothesis_generation",
+      "tool_name": "discover_local_research_gaps"
+    },
+    {
+      "input_summary": "Generated gaps, hypotheses, experiment plans, and local statements.",
+      "order": 7,
+      "output_summary": "Final answer is allowed only with evidence IDs and speculative labels.",
+      "purpose": "Check grounding, overclaiming, testability, and traceability before answering.",
+      "safety_gate": "overclaiming_and_unsupported_claim_checks",
+      "step_type": "safety_check",
+      "tool_name": "evaluate_local_outputs"
+    },
+    {
+      "input_summary": "Question, inspected evidence rows, evaluated gap, and speculative hypothesis.",
+      "order": 8,
+      "output_summary": "For the question 'Which research gaps in the local corpus are supported by evidence IDs?', the local corpus supports a bounded research gap (gap_638445052af4) using evidence IDs stmt_1da2a6251f9b, stmt_e4560ca6d889. A candidate hypothesis (hyp_58460568add6) is speculative, not proven, and should be reviewed by a human before use beyond the demo.",
+      "purpose": "Produce a concise answer grounded in local evidence IDs.",
+      "safety_gate": "human_review_required_for_research_use",
+      "step_type": "final_answer",
+      "tool_name": "compose_grounded_answer"
+    }
+  ],
+  "trace_id": "researchnavigator_deterministic_capstone_trace_v1",
+  "user_research_question": "Which research gaps in the local corpus are supported by evidence IDs?"
+}

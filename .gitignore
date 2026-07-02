@@ -32,6 +32,9 @@ logs/
 tmp/
 .cache/
 
+# Local planning notes
+TODO.md
+
 # Local paper corpus uploads are private workspace data.
 data/papers/*
 !data/papers/
@@ -42,8 +45,18 @@ data/processed/*
 !data/processed/
 !data/processed/.gitkeep
 
-# Local ticket instances are private workspace state.
+# Local ticket files are private workspace state.
 tickets/*
 !tickets/
-!tickets/README.md
-!tickets/TEMPLATE.md
+
+# Local Kaggle-only submission notes.
+SUBMISSION.md
+docs/kaggle_*.md
+docs/capstone_evaluation_mapping.md
+docs/antigravity_demo_notes.md
+docs/demo_script.md
+docs/judge_walkthrough.md
+docs/submission/
+
+# Local validation reports that can be regenerated.
+data/generated/no_secrets_report.json

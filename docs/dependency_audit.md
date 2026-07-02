@@ -1,6 +1,6 @@
 # Dependency Audit
 
-ResearchNavigator includes an offline dependency audit for the local deterministic MVP.
+ResearchNavigator includes an offline dependency audit for the deterministic local baseline.
 
 Run it with:
 
@@ -28,7 +28,7 @@ data/processed/dependency_audit_report.json
 - Core project dependencies are declared.
 - Direct runtime dependencies have lower bounds or exact pins.
 - Direct runtime dependencies are imported by current project code or flagged for review.
-- Direct dependencies do not include known cloud/model-provider SDKs that would conflict with the local-first MVP.
+- Direct dependencies do not include known cloud/model-provider SDKs that would conflict with the local-first baseline.
 - Runtime, optional, and locked dependency counts remain modest.
 
 ## Current Findings
@@ -37,7 +37,7 @@ The current audit is ready with zero failed checks.
 
 Expected warnings:
 
-- `duckdb`: planned alternative structured-storage backend, but the current MVP uses SQLite.
+- `duckdb`: planned alternative structured-storage backend, but the current local baseline uses SQLite.
 - `python-dotenv`: planned environment-loading utility, but current local scripts do not require environment variables.
 - `rich`: planned richer CLI output, but current scripts use lightweight structured logging.
 - `typer`: planned CLI framework, but current scripts use `argparse`.
@@ -47,4 +47,4 @@ These are not blockers. Before final packaging, either keep them as explicitly p
 
 ## Scope
 
-This audit is intentionally local and deterministic. It does not query external vulnerability databases. A production deployment would add an online supply-chain scan such as `pip-audit`, Dependabot, or GitHub dependency review, but that is outside this no-cloud MVP.
+This audit is intentionally local and deterministic. It does not query external vulnerability databases. A production deployment would add an online supply-chain scan such as `pip-audit`, Dependabot, or GitHub dependency review, but that is outside the current local baseline.
