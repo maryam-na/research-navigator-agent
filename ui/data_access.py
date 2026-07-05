@@ -72,10 +72,13 @@ def load_table(db_path: str | Path, table_name: str) -> pd.DataFrame:
     allowed_tables = {"papers", "chunks", "statements"}
     if table_name not in allowed_tables:
         raise ValueError(f"Unsupported table: {table_name}")
-    if not path.exists():
+    if not path.exists() or path.stat().st_size == 0:
         return pd.DataFrame()
-    with sqlite3.connect(path) as conn:
-        return pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+    try:
+        with sqlite3.connect(path) as conn:
+            return pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+    except (sqlite3.DatabaseError, pd.errors.DatabaseError):
+        return pd.DataFrame()
 
 
 def load_json_file(path: str | Path) -> dict[str, Any]:
@@ -676,6 +679,9 @@ def build_artifact_readiness(artifact_specs: list[dict[str, Any]]) -> dict[str, 
         if stat is None:
             status = "missing"
             reason = "Artifact file is missing."
+        elif stat.st_size == 0:
+            status = "missing"
+            reason = "Artifact file is empty."
         elif missing_dependencies:
             status = "stale"
             dependency_names = ", ".join(item["label"] for item in missing_dependencies)

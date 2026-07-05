@@ -56,7 +56,8 @@ And no external action is performed.
 Given processed artifacts exist in `data/processed/`
 When the user opens the Streamlit dashboard
 Then the dashboard shows papers, statements, graph summary, gaps, hypotheses, plans, evaluation metrics, and warnings
-And the evidence inspector links generated outputs back to source statement IDs.
+And the evidence inspector links generated outputs back to source statement IDs
+And the dashboard can rebuild or reset generated local demo outputs without removing the local paper corpus.
 
 ## Scenario 8: Evaluation Is Honest
 

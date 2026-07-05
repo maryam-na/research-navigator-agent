@@ -38,16 +38,16 @@ The current implementation is a deterministic offline baseline with an ADK-facin
 
 ## Capstone Evaluation Coverage
 
-| Course / rubric concept | Where it appears |
-| --- | --- |
-| ADK agent / tool orchestration | [app/agent.py](app/agent.py), [app/adk_tools.py](app/adk_tools.py), Streamlit `Pipeline Trace` tab |
-| MCP server | [app/mcp_server.py](app/mcp_server.py), [scripts/run_mcp_server.py](scripts/run_mcp_server.py), `make mcp` |
-| Antigravity/Codex usage | Use Kaggle media to show the AI-assisted development workflow |
+| Course / rubric concept | Where it appears                                                                                                                                                                                             |
+| --- |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ADK agent / tool orchestration | [app/agent.py](app/agent.py), [app/adk_tools.py](app/adk_tools.py), Streamlit `Pipeline Trace` tab                                                                                                           |
+| MCP server | [app/mcp_server.py](app/mcp_server.py), [scripts/run_mcp_server.py](scripts/run_mcp_server.py), `make mcp`                                                                                                   |
+| Antigravity/Codex usage | Use Kaggle media to show the AI-assisted development workflow                                                                                                                                                |
 | Security features | [tools/safety_tools.py](tools/safety_tools.py), [tools/policy_tools.py](tools/policy_tools.py), [scripts/check_no_secrets.py](scripts/check_no_secrets.py), [specs/safety_policy.md](specs/safety_policy.md) |
-| Deployability / reproducibility | `make demo`, `make preflight`, `make validate`, `uv run pytest`, local artifact checks |
-| Agent skills / Agents CLI | [SKILL.md](SKILL.md), `.agent/skills/research-navigator/SKILL.md`, ADK-facing tool design |
-| Evaluation | [evals/golden_cases.json](evals/golden_cases.json), [scripts/run_golden_evals.py](scripts/run_golden_evals.py), [scripts/validate_submission.py](scripts/validate_submission.py) |
-| Privacy-preserving workflow | Local PDFs, local SQLite, local graph, no required network calls after setup |
+| Deployability / reproducibility | `make demo`, `make preflight`, `make validate`, `uv run pytest`, local artifact checks                                                                                                                       |
+| Agent skills / Agents CLI | [SKILL.md](SKILL.md), `.agent/skills/research-navigator/SKILL.md`, ADK-facing tool design                                                                                                                    |
+| Evaluation | [evals/golden_cases.json](evals/golden_cases.json), [scripts/run_golden_evals.py](scripts/run_golden_evals.py), [scripts/validate_submission.py](scripts/validate_submission.py)                             |
+| Privacy-preserving workflow | Local PDFs, local SQLite, local graph, no required network calls after setup                                                                                                                                 |
 
 ## Quickstart
 
@@ -120,14 +120,19 @@ Security is part of the workflow, not an afterthought.
 1. Run `make demo` to rebuild local artifacts.
 2. Run `make trace` to export the deterministic agent trajectory.
 3. Launch `make ui`.
-4. Search for `limitations evaluation dataset`.
-5. Open a result and inspect linked evidence IDs.
-6. Review ranked gaps and speculative hypotheses in `Discoveries`.
-7. Inspect graph structure in `Knowledge Graph`.
-8. Review scores and warnings in `Safety & Evaluation`.
-9. Open `Pipeline Trace` to show the ADK-facing tool manifest, planned trajectory, MCP wrapper, and local reproducibility commands.
+4. Optional: use the dashboard `Demo controls` panel to run the same local rebuild as `make demo`, or reset generated demo outputs without removing PDFs before recording a fresh run.
+5. Search for `limitations evaluation dataset`.
+6. Open a result and inspect linked evidence IDs.
+7. Review ranked gaps and speculative hypotheses in `Discoveries`.
+8. Inspect graph structure in `Knowledge Graph`.
+9. Review scores and warnings in `Safety & Evaluation`.
+10. Open `Pipeline Trace` to show the ADK-facing tool manifest, planned trajectory, MCP wrapper, and local reproducibility commands.
 
 ## Demo Screenshots
+
+Start with local PDFs:
+
+![Start with local PDFs](docs/screenshots/corpus_start.png)
 
 Search-first discovery:
 
@@ -141,13 +146,17 @@ Ranked discoveries:
 
 ![Ranked discoveries](docs/screenshots/discoveries.png)
 
-Knowledge graph preview:
+Knowledge graph overview:
 
-![Knowledge graph preview](docs/screenshots/graph.png)
+![Knowledge graph overview](docs/screenshots/graph.png)
 
 Safety and evaluation:
 
 ![Safety and evaluation](docs/screenshots/safety_evaluation.png)
+
+Pipeline Trace demo controls:
+
+![Pipeline Trace demo controls](docs/screenshots/pipeline_demo_controls.png)
 
 
 ## Repository Map

@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 if __package__ in {None, ""}:
@@ -55,7 +56,9 @@ from ui.data_access import (
 )
 from ui.pipeline_runner import (
     LocalPipelineRunResult,
+    LocalPipelineResetResult,
     run_local_pipeline,
+    reset_local_demo_outputs,
     validate_local_pipeline_config,
 )
 
@@ -76,6 +79,7 @@ EVIDENCE_SELECTBOX_KEY = "evidence_inspector_statement_selectbox"
 SEARCH_RESULTS_PAGE_KEY = "search_results_page"
 SEARCH_RESULTS_PAGE_SIZE_KEY = "search_results_page_size"
 LAST_PIPELINE_RUN_KEY = "last_local_pipeline_run"
+LAST_PIPELINE_RESET_KEY = "last_local_pipeline_reset"
 PIPELINE_COMMANDS = [
     "uv run python -m scripts.ingest_papers --papers-dir data/papers --db-path data/processed/papers.sqlite --extract-statements --filter-statements --max-statements-per-type-per-paper 30",
     "uv run python -m scripts.build_graph --db-path data/processed/papers.sqlite --graph-path data/processed/research_graph.graphml",
@@ -212,6 +216,21 @@ GRAPH_NODE_TYPE_STYLES = {
 }
 GRAPH_NODE_TYPE_ORDER = {
     node_type: index for index, node_type in enumerate(GRAPH_NODE_TYPE_STYLES)
+}
+GRAPH_RAW_PROVENANCE_TYPES = {"paper", "statement"}
+GRAPH_LAYOUT_TYPE_ORDER = {
+    "paper": 0,
+    "statement": 1,
+    "dataset": 2,
+    "method": 3,
+    "result": 4,
+    "limitation": 5,
+    "future_work": 6,
+    "gap": 7,
+    "hypothesis": 8,
+    "experiment_plan": 9,
+    "background": 10,
+    "unknown": 11,
 }
 GRAPH_LABEL_MODES = ["Key labels", "All labels", "No labels"]
 
@@ -1067,36 +1086,70 @@ def _clear_app_data_cache() -> None:
         clear()
 
 
+def _clear_demo_review_state() -> None:
+    exact_keys = (
+        SELECTED_EVIDENCE_KEY,
+        SELECTED_EVIDENCE_SOURCE_KEY,
+        EVIDENCE_SELECTBOX_KEY,
+        SEARCH_RESULTS_PAGE_KEY,
+        "last_search_results",
+    )
+    dynamic_prefixes = (f"{EVIDENCE_SELECTBOX_KEY}-",)
+    for key in list(st.session_state.keys()):
+        if key in exact_keys or any(str(key).startswith(prefix) for prefix in dynamic_prefixes):
+            st.session_state.pop(key, None)
+
+
 def _render_pipeline_run_control(section_key: str) -> None:
     validation = validate_local_pipeline_config(DEFAULT_CONFIG_PATH)
     with st.container(border=True):
-        st.markdown("#### Run local pipeline")
+        st.markdown("#### Demo controls")
+        st.caption(
+            "Run demo pipeline matches `make demo`: it rebuilds the local SQLite database, "
+            "knowledge graph, gaps, hypotheses, evaluation report, and brief from PDFs "
+            "in data/papers."
+        )
         for warning in validation.warnings:
             st.warning(warning)
         for error in validation.errors:
             st.error(error)
-        reset_existing = st.checkbox(
-            "Reset processed artifacts before running",
-            value=True,
-            key=f"{section_key}-reset-pipeline",
-            help="Matches `make demo` behavior by rebuilding local processed outputs.",
-        )
-        button_cols = st.columns([1, 3])
+        button_cols = st.columns([1.2, 1.2, 2.2])
         run_clicked = button_cols[0].button(
-            "Run local pipeline",
+            "Run demo pipeline",
             type="primary",
             disabled=not validation.ok,
             key=f"{section_key}-run-pipeline",
+            help="Same local rebuild as `make demo`; no external APIs are called.",
         )
-        button_cols[1].caption(
-            "Runs ingestion, graph building, gap discovery, evaluation, "
-            "and brief generation locally."
+        reset_clicked = button_cols[1].button(
+            "Reset demo outputs",
+            key=f"{section_key}-reset-demo-outputs",
+            help=(
+                "Deletes generated processed demo files so a new demo starts clean. "
+                "Local PDFs and the manifest are preserved."
+            ),
+        )
+        button_cols[2].caption(
+            "Use reset before recording a fresh run. It removes generated processed artifacts "
+            "only; your corpus PDFs stay in place."
         )
         last_result = st.session_state.get(LAST_PIPELINE_RUN_KEY)
         if isinstance(last_result, LocalPipelineRunResult):
             _render_pipeline_run_result(last_result)
+        last_reset = st.session_state.get(LAST_PIPELINE_RESET_KEY)
+        if isinstance(last_reset, LocalPipelineResetResult):
+            _render_pipeline_reset_result(last_reset)
+        if reset_clicked:
+            result = reset_local_demo_outputs(config_path=DEFAULT_CONFIG_PATH)
+            st.session_state[LAST_PIPELINE_RESET_KEY] = result
+            st.session_state.pop(LAST_PIPELINE_RUN_KEY, None)
+            if result.ok:
+                _clear_app_data_cache()
+                _clear_demo_review_state()
+                st.rerun()
+            _render_pipeline_reset_result(result)
         if run_clicked:
-            status = st.status("Running local pipeline...", expanded=True)
+            status = st.status("Running demo pipeline...", expanded=True)
 
             def show_progress(_stage: str, message: str) -> None:
                 status.write(message)
@@ -1104,15 +1157,17 @@ def _render_pipeline_run_control(section_key: str) -> None:
             with status:
                 result = run_local_pipeline(
                     config_path=DEFAULT_CONFIG_PATH,
-                    reset=reset_existing,
+                    reset=True,
                     progress_callback=show_progress,
                 )
                 st.session_state[LAST_PIPELINE_RUN_KEY] = result
+                st.session_state.pop(LAST_PIPELINE_RESET_KEY, None)
                 if result.ok:
                     _clear_app_data_cache()
-                    status.update(label="Local pipeline completed.", state="complete")
+                    _clear_demo_review_state()
+                    status.update(label="Demo pipeline completed.", state="complete")
                     st.rerun()
-                status.update(label="Local pipeline failed.", state="error")
+                status.update(label="Demo pipeline failed.", state="error")
                 _render_pipeline_run_result(result)
 
 
@@ -1148,6 +1203,23 @@ def _render_pipeline_run_result(result: LocalPipelineRunResult) -> None:
     if result.artifact_paths:
         with st.expander("Regenerated artifact paths", expanded=False):
             st.json(result.artifact_paths)
+
+
+def _render_pipeline_reset_result(result: LocalPipelineResetResult) -> None:
+    if result.ok:
+        st.success(result.message)
+    else:
+        st.error(result.message)
+    for error in result.errors:
+        st.error(error)
+    if result.removed_artifacts or result.missing_artifacts:
+        with st.expander("Reset artifact paths", expanded=False):
+            st.json(
+                {
+                    "removed": result.removed_artifacts,
+                    "already_missing": result.missing_artifacts,
+                }
+            )
 
 
 def _artifact_by_key(readiness: dict[str, object], artifact_key: str) -> dict | None:
@@ -2017,9 +2089,9 @@ def _render_chain_plans(plans: list[dict]) -> None:
                 st.write(value)
 
 
-def _render_corpus_setup() -> None:
+def _render_corpus_intake(section_key: str) -> None:
     _section_header(
-        "Local PDF corpus setup",
+        "Start with local PDFs",
         "Add 5-10 permitted PDFs to the local workspace before running the deterministic pipeline.",
         "Corpus",
     )
@@ -2034,7 +2106,38 @@ def _render_corpus_setup() -> None:
         columns=4,
     )
     _render_corpus_status_message(status)
+    _render_pdf_upload_panel(status, section_key)
 
+
+def _render_corpus_setup() -> None:
+    _section_header(
+        "Local corpus files and demo controls",
+        "Review saved PDFs, then rebuild or reset generated local demo outputs.",
+        "Corpus",
+    )
+    status = describe_pdf_corpus(DEFAULT_PAPERS_DIR, DEFAULT_MANIFEST_PATH)
+    _metric_cards(
+        [
+            ("Local PDFs", status["pdf_count"]),
+            ("Manifest entries", status["manifest_count"]),
+            ("MVP range", f"{CORPUS_MIN_PDFS}-{CORPUS_MAX_PDFS}"),
+            ("Processed DB", "ready" if DEFAULT_DB_PATH.exists() else "missing"),
+        ],
+        columns=4,
+    )
+    _render_corpus_status_message(status)
+    _render_local_corpus_files(status)
+    _render_pipeline_run_control("corpus")
+    st.markdown("#### Terminal fallback")
+    st.code("\n".join(PIPELINE_COMMANDS[:-1]), language="bash")
+    if not DEFAULT_DB_PATH.exists():
+        st.info(
+            "Processed artifacts are missing. Use the Run demo pipeline button or run the "
+            "local commands above after saving the corpus."
+        )
+
+
+def _render_pdf_upload_panel(status: dict, section_key: str) -> None:
     with st.container(border=True):
         st.markdown("#### Add PDFs")
         uploaded_files = st.file_uploader(
@@ -2042,15 +2145,18 @@ def _render_corpus_setup() -> None:
             type=["pdf"],
             accept_multiple_files=True,
             help="Files are saved only under data/papers in this workspace.",
+            key=f"{section_key}-pdf-files",
         )
         replace_existing = st.checkbox(
             "Replace existing local PDFs before saving",
             value=False,
             help="Only PDF files in data/papers are removed; processed artifacts are left untouched.",
+            key=f"{section_key}-replace-existing-pdfs",
         )
         confirmed_permission = st.checkbox(
             "I confirm these papers are synthetic, sample, open-access, or otherwise permitted.",
             value=False,
+            key=f"{section_key}-confirmed-pdf-permission",
         )
         uploaded_names = [str(file.name) for file in uploaded_files]
         validation = validate_pdf_upload_selection(
@@ -2064,7 +2170,12 @@ def _render_corpus_setup() -> None:
             for error in validation.errors:
                 st.error(error)
         save_disabled = not uploaded_files or not confirmed_permission or bool(validation.errors)
-        if st.button("Save PDFs locally", type="primary", disabled=save_disabled):
+        if st.button(
+            "Save PDFs locally",
+            type="primary",
+            disabled=save_disabled,
+            key=f"{section_key}-save-pdfs-locally",
+        ):
             try:
                 result = save_uploaded_pdfs(
                     uploaded_files,
@@ -2080,7 +2191,10 @@ def _render_corpus_setup() -> None:
                 status = result["corpus"]
                 st.success(f"Saved {saved_count} PDF file{'s' if saved_count != 1 else ''} locally.")
                 _render_dataframe(pd.DataFrame(result["saved_files"]))
+                _clear_app_data_cache()
 
+
+def _render_local_corpus_files(status: dict) -> None:
     st.markdown("#### Local corpus files")
     pdf_rows = pd.DataFrame({"pdf_file": status["pdf_files"]})
     if pdf_rows.empty:
@@ -2096,15 +2210,6 @@ def _render_corpus_setup() -> None:
                     "missing_from_disk": [", ".join(status["missing_from_disk"]) or "none"],
                 }
             )
-        )
-
-    _render_pipeline_run_control("corpus")
-    st.markdown("#### Terminal fallback")
-    st.code("\n".join(PIPELINE_COMMANDS[:-1]), language="bash")
-    if not DEFAULT_DB_PATH.exists():
-        st.info(
-            "Processed artifacts are missing. Use the Run local pipeline button or run the "
-            "local commands above after saving the corpus."
         )
 
 
@@ -2792,11 +2897,22 @@ def _graph_node_type_sort_key(node_type: str) -> tuple[int, str]:
     return (GRAPH_NODE_TYPE_ORDER.get(node_type, 99), node_type)
 
 
+def _graph_layout_type_sort_key(node_type: str) -> tuple[int, str]:
+    return (GRAPH_LAYOUT_TYPE_ORDER.get(node_type, 99), node_type)
+
+
 def _graph_available_node_types(graph: nx.DiGraph) -> list[str]:
     return sorted(
         {_graph_node_type(attrs) for _node_id, attrs in graph.nodes(data=True)},
         key=_graph_node_type_sort_key,
     )
+
+
+def _default_graph_node_types(available_node_types: list[str]) -> list[str]:
+    semantic_types = [
+        node_type for node_type in available_node_types if node_type not in GRAPH_RAW_PROVENANCE_TYPES
+    ]
+    return semantic_types or available_node_types
 
 
 def _graph_available_relation_types(graph: nx.DiGraph) -> list[str]:
@@ -2953,6 +3069,32 @@ def _graph_relation_summary(graph: nx.DiGraph) -> str:
     return " | ".join(f"{relation}: {count}" for relation, count in relation_types.items())
 
 
+def _graph_layout_positions(graph: nx.DiGraph) -> dict[str, tuple[float, float]]:
+    """Return deterministic layered graph positions for readable UI previews."""
+
+    nodes_by_type: dict[str, list[str]] = {}
+    for node_id, attrs in graph.nodes(data=True):
+        node_type = _graph_node_type(attrs)
+        nodes_by_type.setdefault(node_type, []).append(str(node_id))
+    ordered_types = sorted(nodes_by_type, key=_graph_layout_type_sort_key)
+    if not ordered_types:
+        return {}
+
+    positions: dict[str, tuple[float, float]] = {}
+    type_count = len(ordered_types)
+    for type_index, node_type in enumerate(ordered_types):
+        x = 0.0 if type_count == 1 else -1.0 + (2.0 * type_index / (type_count - 1))
+        nodes = sorted(
+            nodes_by_type[node_type],
+            key=lambda node_id: _graph_node_sort_key(graph, node_id),
+        )
+        node_count = len(nodes)
+        for node_index, node_id in enumerate(nodes):
+            y = 0.0 if node_count == 1 else 0.9 - (1.8 * node_index / (node_count - 1))
+            positions[node_id] = (x, y)
+    return positions
+
+
 def _render_graph_summary(graph: nx.DiGraph, source_note: str) -> None:
     summary = graph_summary(graph)
     _metric_cards(
@@ -2985,7 +3127,370 @@ def _render_graph_legend(graph: nx.DiGraph) -> None:
             + html.escape(f"{label}: {count}")
             + "</span>"
         )
-    st.markdown(f'<div class="rn-graph-legend">{"".join(legend_items)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="rn-graph-legend">{"".join(legend_items)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _build_knowledge_map_model(data: dict, graph: nx.DiGraph) -> dict[str, list[dict]]:
+    statements = _statement_records(data.get("statements", pd.DataFrame()))
+    statement_type_counts = Counter(
+        str(statement.get("statement_type", "unknown") or "unknown")
+        for statement in statements
+    )
+    relation_counts = Counter(graph_summary(graph).get("relation_types", {}) or {})
+    statement_lookup = _statement_lookup_from_data(data)
+    gap_source_type_counts: Counter[str] = Counter()
+    for gap in data.get("gaps", []) or []:
+        for statement_id in gap.get("source_statement_ids", []) or []:
+            statement = statement_lookup.get(str(statement_id), {})
+            statement_type = str(statement.get("statement_type", "") or "")
+            if statement_type:
+                gap_source_type_counts[statement_type] += 1
+
+    nodes = [
+        _knowledge_map_node(
+            "papers",
+            "Local papers",
+            len(data.get("papers", pd.DataFrame())),
+            "paper",
+            "Bounded corpus",
+            36,
+            244,
+        ),
+        _knowledge_map_node(
+            "evidence",
+            "Evidence statements",
+            len(statements),
+            "statement",
+            "Grounded snippets",
+            218,
+            244,
+        ),
+    ]
+    semantic_layout = [
+        ("dataset", "Datasets", "Data mentions", 40),
+        ("method", "Methods", "Approaches", 130),
+        ("result", "Results", "Reported outcomes", 220),
+        ("limitation", "Limitations", "Known constraints", 310),
+        ("future_work", "Future work", "Suggested directions", 400),
+    ]
+    for node_type, label, note, y in semantic_layout:
+        count = int(statement_type_counts.get(node_type, 0))
+        if count:
+            nodes.append(
+                _knowledge_map_node(node_type, label, count, node_type, note, 408, y)
+            )
+    nodes.extend(
+        [
+            _knowledge_map_node(
+                "gaps",
+                "Research gaps",
+                len(data.get("gaps", []) or []),
+                "gap",
+                "Evidence-linked",
+                626,
+                244,
+            ),
+            _knowledge_map_node(
+                "hypotheses",
+                "Hypotheses",
+                len(data.get("hypotheses", []) or []),
+                "hypothesis",
+                "Speculative",
+                808,
+                244,
+            ),
+            _knowledge_map_node(
+                "plans",
+                "Experiment plans",
+                len(data.get("experiment_plans", []) or []),
+                "experiment_plan",
+                "Review needed",
+                990,
+                244,
+            ),
+        ]
+    )
+    node_keys = {node["key"] for node in nodes}
+    edges = [
+        _knowledge_map_edge("papers", "evidence", "contains", len(statements)),
+    ]
+    for node_type, _label, _note, _y in semantic_layout:
+        edges.append(
+            _knowledge_map_edge(
+                "evidence",
+                node_type,
+                "classified as",
+                int(statement_type_counts.get(node_type, 0)),
+            )
+        )
+    relation_edges = [
+        ("dataset", "method", "used by", int(relation_counts.get("used_by", 0))),
+        ("method", "result", "supports", int(relation_counts.get("supports", 0))),
+        ("result", "limitation", "limited by", int(relation_counts.get("limited_by", 0))),
+        ("limitation", "future_work", "motivates", int(relation_counts.get("motivates", 0))),
+    ]
+    edges.extend(_knowledge_map_edge(*edge) for edge in relation_edges)
+    for source_type in ("limitation", "future_work", "result", "method", "dataset"):
+        edges.append(
+            _knowledge_map_edge(
+                source_type,
+                "gaps",
+                "suggests",
+                int(gap_source_type_counts.get(source_type, 0)),
+            )
+        )
+    edges.extend(
+        [
+            _knowledge_map_edge(
+                "gaps",
+                "hypotheses",
+                "motivates",
+                len(data.get("hypotheses", []) or []),
+            ),
+            _knowledge_map_edge(
+                "hypotheses",
+                "plans",
+                "tested by",
+                len(data.get("experiment_plans", []) or []),
+            ),
+        ]
+    )
+    return {
+        "nodes": nodes,
+        "edges": [
+            edge
+            for edge in edges
+            if edge["count"] > 0
+            and edge["source"] in node_keys
+            and edge["target"] in node_keys
+        ],
+    }
+
+
+def _knowledge_map_node(
+    key: str,
+    label: str,
+    count: int,
+    node_type: str,
+    note: str,
+    x: int,
+    y: int,
+) -> dict:
+    return {
+        "key": key,
+        "label": label,
+        "count": int(count),
+        "node_type": node_type,
+        "note": note,
+        "x": x,
+        "y": y,
+        "width": 138,
+        "height": 68,
+    }
+
+
+def _knowledge_map_edge(source: str, target: str, relation: str, count: int) -> dict:
+    return {
+        "source": source,
+        "target": target,
+        "relation": relation,
+        "count": int(count),
+    }
+
+
+def _render_knowledge_map(data: dict, graph: nx.DiGraph) -> None:
+    model = _build_knowledge_map_model(data, graph)
+    if not model["nodes"]:
+        st.info("No knowledge graph overview is available yet.")
+        return
+    _metric_cards(
+        [
+            ("Graph nodes", graph.number_of_nodes()),
+            ("Graph edges", graph.number_of_edges()),
+            ("Generated gaps", len(data.get("gaps", []) or [])),
+            ("Experiment plans", len(data.get("experiment_plans", []) or [])),
+        ],
+        columns=4,
+    )
+    st.caption(
+        "Presentation view: compact counts and relationship types from the same local NetworkX graph."
+    )
+    st.markdown(_knowledge_map_markup(model), unsafe_allow_html=True)
+
+
+def _knowledge_map_markup(model: dict[str, list[dict]]) -> str:
+    nodes = {str(node["key"]): node for node in model["nodes"]}
+    semantic_keys = [
+        key
+        for key in ("dataset", "method", "result", "limitation", "future_work")
+        if key in nodes
+    ]
+    generated_keys = [key for key in ("gaps", "hypotheses", "plans") if key in nodes]
+    stages = [
+        ("1", "Local corpus", ["papers"], ""),
+        ("2", "Grounded evidence", ["evidence"], ""),
+        ("3", "Extracted research units", semantic_keys, "rn-kg-stage-wide"),
+        ("4", "Generated outputs", generated_keys, ""),
+    ]
+    stage_markup = []
+    for number, title, keys, class_name in stages:
+        cards = "".join(_knowledge_map_card(nodes[key]) for key in keys if key in nodes)
+        if not cards:
+            cards = '<div class="rn-kg-empty">No items yet.</div>'
+        stage_markup.append(
+            f'<section class="rn-kg-stage {class_name}">'
+            f'<div class="rn-kg-stage-title"><span>{html.escape(number)}</span>'
+            f'{html.escape(title)}</div>'
+            f'<div class="rn-kg-card-grid">{cards}</div>'
+            f'</section>'
+        )
+
+    stage_links = [
+        _knowledge_map_stage_link(
+            "contains",
+            _knowledge_map_edge_count(model["edges"], {"papers"}, {"evidence"}),
+        ),
+        _knowledge_map_stage_link(
+            "classified as",
+            _knowledge_map_edge_count(model["edges"], {"evidence"}, set(semantic_keys)),
+        ),
+        _knowledge_map_stage_link(
+            "suggests gaps",
+            _knowledge_map_edge_count(model["edges"], set(semantic_keys), {"gaps"}),
+        ),
+    ]
+    flow_items = []
+    for index, stage in enumerate(stage_markup):
+        flow_items.append(stage)
+        if index < len(stage_links):
+            flow_items.append(stage_links[index])
+
+    relations = "".join(_knowledge_map_relation_chip(edge, nodes) for edge in model["edges"])
+    if not relations:
+        relations = '<span class="rn-kg-empty">No relationship links yet.</span>'
+    return (
+        '<div class="rn-knowledge-flow" role="img" '
+        'aria-label="Professional knowledge graph overview">'
+        '<style>'
+        '.rn-knowledge-flow{width:100%;margin:.65rem 0 1rem;color:#111827}'
+        '.rn-kg-flow-grid{display:grid;grid-template-columns:minmax(150px,.8fr) '
+        '78px minmax(170px,.9fr) 78px minmax(280px,1.55fr) 78px '
+        'minmax(210px,1.05fr);gap:12px;'
+        'align-items:start}'
+        '.rn-kg-stage{min-width:0;display:flex;flex-direction:column;gap:8px}'
+        '.rn-kg-stage-title{display:flex;align-items:center;gap:7px;font:800 11px sans-serif;'
+        'text-transform:uppercase;letter-spacing:.04em;color:#64748b;min-height:22px}'
+        '.rn-kg-stage-title span{display:inline-flex;align-items:center;justify-content:center;'
+        'width:20px;height:20px;border-radius:999px;background:#eef2f7;color:#334155}'
+        '.rn-kg-card-grid{display:grid;grid-template-columns:1fr;gap:8px;min-width:0}'
+        '.rn-kg-stage-wide .rn-kg-card-grid{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}'
+        '.rn-kg-card{min-width:0;min-height:78px;border:1px solid #d8dee8;border-left:4px solid '
+        'var(--rn-node-color);border-radius:8px;background:#fff;padding:10px 11px;'
+        'box-shadow:0 1px 2px rgba(15,23,42,.06)}'
+        '.rn-kg-card-top{display:flex;align-items:flex-start;gap:7px;min-width:0}'
+        '.rn-kg-dot{flex:0 0 auto;width:9px;height:9px;border-radius:999px;'
+        'background:var(--rn-node-color);margin-top:3px}'
+        '.rn-kg-label{min-width:0;font:800 13px/1.25 sans-serif;color:#111827;'
+        'overflow-wrap:anywhere}'
+        '.rn-kg-count-row{display:flex;align-items:baseline;gap:7px;min-width:0;margin-top:8px}'
+        '.rn-kg-count{font:850 23px/1 sans-serif;color:#111827;white-space:nowrap}'
+        '.rn-kg-note{min-width:0;font:500 11px/1.25 sans-serif;color:#64748b;'
+        'overflow-wrap:anywhere}'
+        '.rn-kg-stage-link{min-width:0;min-height:104px;padding-top:28px;display:flex;'
+        'align-items:center;justify-content:center;color:#64748b}'
+        '.rn-kg-link-pill{width:100%;display:flex;flex-direction:column;align-items:center;'
+        'gap:5px;text-align:center}'
+        '.rn-kg-link-line{width:100%;height:2px;border-radius:999px;background:#cbd5e1;'
+        'position:relative}'
+        '.rn-kg-link-line:after{content:"";position:absolute;right:-1px;top:-4px;'
+        'border-left:8px solid #cbd5e1;border-top:5px solid transparent;'
+        'border-bottom:5px solid transparent}'
+        '.rn-kg-link-label{max-width:100%;font:800 10px/1.15 sans-serif;color:#334155;'
+        'overflow-wrap:anywhere}'
+        '.rn-kg-link-count{font:700 10px/1 sans-serif;color:#64748b}'
+        '.rn-kg-relations{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:11px;'
+        'border-top:1px solid #e5e7eb}'
+        '.rn-kg-relation-chip{display:inline-flex;flex-wrap:wrap;align-items:center;gap:5px;'
+        'max-width:100%;border:1px solid #d8dee8;border-radius:999px;background:#f8fafc;'
+        'padding:5px 8px;font:600 11px/1.25 sans-serif;color:#475569;overflow-wrap:anywhere}'
+        '.rn-kg-relation-name{color:#111827}.rn-kg-relation-detail{color:#64748b}'
+        '.rn-kg-empty{border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;'
+        'padding:10px 11px;font:600 12px sans-serif;background:#f8fafc}'
+        '@media (max-width:980px){.rn-kg-flow-grid{grid-template-columns:1fr}'
+        '.rn-kg-stage-link{min-height:42px;padding:0}.rn-kg-link-pill{gap:4px}'
+        '.rn-kg-link-line{width:2px;height:28px}.rn-kg-link-line:after{right:-4px;top:auto;'
+        'bottom:-1px;border-top:8px solid #cbd5e1;border-left:5px solid transparent;'
+        'border-right:5px solid transparent;border-bottom:0}}'
+        '@media (max-width:620px){.rn-kg-stage-wide .rn-kg-card-grid{grid-template-columns:1fr}}'
+        '</style>'
+        f'<div class="rn-kg-flow-grid">{"".join(flow_items)}</div>'
+        f'<div class="rn-kg-relations">{relations}</div>'
+        '</div>'
+    )
+
+
+def _knowledge_map_card(node: dict) -> str:
+    color = html.escape(_graph_node_color(str(node["node_type"])))
+    label = html.escape(str(node["label"]))
+    count = html.escape(str(node["count"]))
+    note = html.escape(str(node["note"]))
+    return (
+        f'<article class="rn-kg-card" style="--rn-node-color:{color}">'
+        '<div class="rn-kg-card-top">'
+        '<span class="rn-kg-dot"></span>'
+        f'<div class="rn-kg-label">{label}</div>'
+        '</div>'
+        '<div class="rn-kg-count-row">'
+        f'<span class="rn-kg-count">{count}</span>'
+        f'<span class="rn-kg-note">{note}</span>'
+        '</div>'
+        '</article>'
+    )
+
+
+def _knowledge_map_relation_chip(edge: dict, nodes: dict[str, dict]) -> str:
+    source = nodes.get(str(edge["source"]), {})
+    target = nodes.get(str(edge["target"]), {})
+    source_label = html.escape(str(source.get("label") or edge["source"]))
+    target_label = html.escape(str(target.get("label") or edge["target"]))
+    relation = html.escape(str(edge["relation"]).replace("_", " "))
+    count = html.escape(str(edge["count"]))
+    return (
+        '<span class="rn-kg-relation-chip">'
+        f'<span class="rn-kg-relation-name">{source_label} &rarr; {target_label}</span>'
+        f'<span class="rn-kg-relation-detail">{relation} &middot; {count}</span>'
+        '</span>'
+    )
+
+
+def _knowledge_map_edge_count(
+    edges: list[dict],
+    source_keys: set[str],
+    target_keys: set[str],
+) -> int:
+    return sum(
+        int(edge["count"])
+        for edge in edges
+        if str(edge["source"]) in source_keys and str(edge["target"]) in target_keys
+    )
+
+
+def _knowledge_map_stage_link(label: str, count: int) -> str:
+    count_text = f"{count} link{'s' if count != 1 else ''}"
+    return (
+        '<div class="rn-kg-stage-link" aria-label="'
+        + html.escape(f"{label}: {count_text}")
+        + '">'
+        '<div class="rn-kg-link-pill">'
+        '<span class="rn-kg-link-line"></span>'
+        f'<span class="rn-kg-link-label">{html.escape(label)}</span>'
+        f'<span class="rn-kg-link-count">{html.escape(count_text)}</span>'
+        '</div>'
+        '</div>'
+    )
 
 
 def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
@@ -3001,12 +3506,12 @@ def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
     try:
         import plotly.graph_objects as go
 
-        positions = nx.spring_layout(graph, seed=7)
+        positions = _graph_layout_positions(graph)
         edge_x: list[float | None] = []
         edge_y: list[float | None] = []
         for source, target in graph.edges():
-            x0, y0 = positions[source]
-            x1, y1 = positions[target]
+            x0, y0 = positions[str(source)]
+            x1, y1 = positions[str(target)]
             edge_x.extend([x0, x1, None])
             edge_y.extend([y0, y1, None])
         fig = go.Figure()
@@ -3033,8 +3538,8 @@ def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
             mode = "markers+text" if any(text_labels) else "markers"
             fig.add_trace(
                 go.Scatter(
-                    x=[positions[node][0] for node in nodes],
-                    y=[positions[node][1] for node in nodes],
+                    x=[positions[str(node)][0] for node in nodes],
+                    y=[positions[str(node)][1] for node in nodes],
                     mode=mode,
                     marker={
                         "size": _graph_node_size(node_type),
@@ -3054,7 +3559,7 @@ def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
         fig.update_yaxes(visible=False)
         _render_plotly_chart(fig)
     except Exception:
-        st.info("Interactive graph rendering is unavailable. Showing a local static preview.")
+        st.caption("Showing a deterministic static graph preview.")
         _render_static_graph_svg(graph, label_mode=label_mode)
     with st.expander("Node and edge tables"):
         _render_dataframe(nodes_df)
@@ -3064,7 +3569,7 @@ def _render_graph(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
 def _render_static_graph_svg(graph: nx.DiGraph, label_mode: str = "Key labels") -> None:
     if graph.number_of_nodes() == 0:
         return
-    positions = nx.spring_layout(graph, seed=7)
+    positions = _graph_layout_positions(graph)
     width = 920
     height = 520
     padding = 42
@@ -3284,6 +3789,7 @@ def main() -> None:
 
     _render_header(counts, evaluation)
     _render_artifact_readiness(artifact_readiness, include_details=False)
+    _render_corpus_intake("top-corpus")
 
     if not DEFAULT_DB_PATH.exists():
         _show_pipeline_instructions()
@@ -3404,35 +3910,48 @@ def main() -> None:
         )
         _section_header(
             "Knowledge graph",
-            "Search-linked graph sample when results are available; otherwise an overview subgraph.",
+            "Presentation overview first; raw NetworkX nodes and edges remain inspectable below.",
             "Graph",
         )
         _render_artifact_guidance(artifact_readiness, "graph")
-        available_node_types = _graph_available_node_types(subgraph)
-        control_cols = st.columns([2, 2, 1])
-        selected_node_types = control_cols[0].multiselect(
-            "Node types",
-            available_node_types,
-            default=available_node_types,
-            format_func=_graph_node_type_label,
-            help="Filters the visible preview only; raw graph artifacts remain unchanged.",
-        )
-        node_filtered_subgraph = _filter_graph_by_node_types(subgraph, selected_node_types)
-        available_relation_types = _graph_available_relation_types(node_filtered_subgraph)
-        selected_relation_types = control_cols[1].multiselect(
-            "Relations",
-            available_relation_types,
-            default=available_relation_types,
-            format_func=lambda relation: str(relation).replace("_", " ").title(),
-            help="Filters visible edges while keeping the selected nodes in view.",
-        )
-        label_mode = control_cols[2].selectbox("Labels", GRAPH_LABEL_MODES)
-        filtered_subgraph = _filter_graph_by_relation_types(node_filtered_subgraph, selected_relation_types)
-        _render_graph_summary(filtered_subgraph, graph_source_note)
-        _render_graph_legend(filtered_subgraph)
-        with st.expander("Graph summary data", expanded=False):
-            st.json(graph_summary(filtered_subgraph))
-        _render_graph(filtered_subgraph, label_mode=label_mode)
+        _render_knowledge_map(data, graph)
+        with st.expander("Detailed node-level graph", expanded=False):
+            st.caption(
+                f"{graph_source_note} This is the raw inspectable graph sample, "
+                "including provenance nodes when enabled."
+            )
+            available_node_types = _graph_available_node_types(subgraph)
+            default_node_types = _default_graph_node_types(available_node_types)
+            control_cols = st.columns([2, 2, 1])
+            selected_node_types = control_cols[0].multiselect(
+                "Node types",
+                available_node_types,
+                default=default_node_types,
+                format_func=_graph_node_type_label,
+                help=(
+                    "Filters the visible preview only; raw graph artifacts remain unchanged. "
+                    "Raw paper and statement provenance can be re-enabled here."
+                ),
+            )
+            node_filtered_subgraph = _filter_graph_by_node_types(subgraph, selected_node_types)
+            available_relation_types = _graph_available_relation_types(node_filtered_subgraph)
+            selected_relation_types = control_cols[1].multiselect(
+                "Relations",
+                available_relation_types,
+                default=available_relation_types,
+                format_func=lambda relation: str(relation).replace("_", " ").title(),
+                help="Filters visible edges while keeping the selected nodes in view.",
+            )
+            label_mode = control_cols[2].selectbox("Labels", GRAPH_LABEL_MODES)
+            filtered_subgraph = _filter_graph_by_relation_types(
+                node_filtered_subgraph,
+                selected_relation_types,
+            )
+            _render_graph_summary(filtered_subgraph, graph_source_note)
+            _render_graph_legend(filtered_subgraph)
+            with st.expander("Graph summary data", expanded=False):
+                st.json(graph_summary(filtered_subgraph))
+            _render_graph(filtered_subgraph, label_mode=label_mode)
 
     with report_tab:
         _section_header("Exportable research brief", "A local Markdown brief generated from current artifacts.", "Report")

@@ -42,6 +42,18 @@ class LocalPipelineRunResult:
     artifact_paths: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class LocalPipelineResetResult:
+    """Result from clearing generated local demo outputs."""
+
+    ok: bool
+    message: str
+    removed_artifacts: list[str] = field(default_factory=list)
+    missing_artifacts: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    artifact_paths: dict[str, str] = field(default_factory=dict)
+
+
 def validate_local_pipeline_config(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     workspace_root: str | Path = PROJECT_ROOT,
@@ -151,11 +163,78 @@ def run_local_pipeline(
 
     return LocalPipelineRunResult(
         ok=True,
-        message="Local pipeline completed and processed artifacts were regenerated.",
+        message="Demo pipeline completed and processed artifacts were regenerated.",
         summary=summary,
         warnings=validation.warnings,
         corpus=validation.corpus,
         artifact_paths=validation.artifact_paths,
+    )
+
+
+def reset_local_demo_outputs(
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
+    workspace_root: str | Path = PROJECT_ROOT,
+) -> LocalPipelineResetResult:
+    """Remove generated demo artifacts while preserving the local paper corpus."""
+
+    root = Path(workspace_root).expanduser().resolve(strict=False)
+    try:
+        config = load_config(config_path)
+    except Exception as exc:
+        return LocalPipelineResetResult(
+            ok=False,
+            message="Demo outputs were not reset.",
+            errors=[f"Unable to load local pipeline config: {exc}"],
+        )
+
+    path_result = _resolve_pipeline_paths(config, root)
+    if path_result["errors"]:
+        return LocalPipelineResetResult(
+            ok=False,
+            message="Demo outputs were not reset.",
+            errors=path_result["errors"],
+            artifact_paths=path_result["artifact_paths"],
+        )
+
+    reset_keys = ("db_path", "graph_path", "discovery_path", "evaluation_path", "brief_path")
+    paths = {key: path_result["paths"][key] for key in reset_keys}
+    artifact_paths = {key: str(path) for key, path in paths.items()}
+    removed_artifacts: list[str] = []
+    missing_artifacts: list[str] = []
+    errors: list[str] = []
+    for label, path in paths.items():
+        if not path.exists():
+            missing_artifacts.append(str(path))
+            continue
+        if not path.is_file():
+            errors.append(f"{label} points to a directory; refusing to remove it: {path}")
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            errors.append(f"Unable to remove {path}: {exc}")
+        else:
+            removed_artifacts.append(str(path))
+
+    if errors:
+        return LocalPipelineResetResult(
+            ok=False,
+            message="Demo reset did not complete.",
+            removed_artifacts=removed_artifacts,
+            missing_artifacts=missing_artifacts,
+            errors=errors,
+            artifact_paths=artifact_paths,
+        )
+    if removed_artifacts:
+        message = "Generated demo outputs were reset. Local PDFs were left unchanged."
+    else:
+        message = "No generated demo outputs needed reset. Local PDFs were left unchanged."
+    return LocalPipelineResetResult(
+        ok=True,
+        message=message,
+        removed_artifacts=removed_artifacts,
+        missing_artifacts=missing_artifacts,
+        artifact_paths=artifact_paths,
     )
 
 

@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
-from ui.pipeline_runner import run_local_pipeline, validate_local_pipeline_config
+from ui.pipeline_runner import (
+    reset_local_demo_outputs,
+    run_local_pipeline,
+    validate_local_pipeline_config,
+)
 
 
 def write_config(root: Path, **path_overrides: str) -> Path:
@@ -169,3 +173,40 @@ def test_run_local_pipeline_reports_runner_failure(tmp_path):
     assert result.ok is False
     assert result.message == "Local pipeline failed."
     assert result.errors == ["RuntimeError: pipeline broke"]
+
+
+def test_reset_local_demo_outputs_removes_generated_artifacts_only(tmp_path):
+    config_path = write_config(tmp_path)
+    write_corpus(tmp_path, [f"paper_{index}.pdf" for index in range(5)])
+    artifact_paths = [
+        tmp_path / "data/processed/papers.sqlite",
+        tmp_path / "data/processed/research_graph.graphml",
+        tmp_path / "data/processed/gaps_and_hypotheses.json",
+        tmp_path / "data/processed/evaluation_report.json",
+        tmp_path / "data/processed/researchnavigator_brief.md",
+    ]
+    for artifact_path in artifact_paths:
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_text("generated", encoding="utf-8")
+    pdf_path = tmp_path / "data/papers/paper_0.pdf"
+
+    result = reset_local_demo_outputs(config_path, workspace_root=tmp_path)
+
+    assert result.ok is True
+    assert "Local PDFs were left unchanged" in result.message
+    assert sorted(result.removed_artifacts) == sorted(
+        str(path.resolve()) for path in artifact_paths
+    )
+    assert result.missing_artifacts == []
+    assert all(not path.exists() for path in artifact_paths)
+    assert pdf_path.exists()
+
+
+def test_reset_local_demo_outputs_blocks_paths_outside_workspace(tmp_path):
+    config_path = write_config(tmp_path, db_path="../outside.sqlite")
+
+    result = reset_local_demo_outputs(config_path, workspace_root=tmp_path)
+
+    assert result.ok is False
+    assert result.message == "Demo outputs were not reset."
+    assert "must stay inside the local project workspace" in result.errors[0]

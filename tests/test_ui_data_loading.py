@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 
 import networkx as nx
 
@@ -11,6 +12,7 @@ from ui.streamlit_app import (
     _artifact_readiness_summary,
     _artifact_recovery_steps,
     _available_statement_ids,
+    _default_graph_node_types,
     _evaluation_caveat_items,
     _evidence_statement_ids_for_result,
     _filter_gap_triage,
@@ -24,9 +26,12 @@ from ui.streamlit_app import (
     _graph_display_label,
     _graph_hover_text,
     _graph_label_node_ids,
+    _graph_layout_positions,
     _graph_node_text_label,
     _graph_node_type_label,
     _hypothesis_next_action,
+    _build_knowledge_map_model,
+    _knowledge_map_markup,
     _limit_search_results,
     _load_ui_settings,
     _paginate_search_results,
@@ -98,6 +103,17 @@ def test_load_helpers_handle_missing_files(tmp_path):
     assert load_processed_data(missing_db)["papers"].empty
     assert load_json_file(missing_json) == {}
     assert load_graph(missing_graph).number_of_nodes() == 0
+
+
+def test_load_helpers_handle_empty_or_schema_missing_database(tmp_path):
+    empty_db = tmp_path / "empty.sqlite"
+    empty_db.write_bytes(b"")
+    schema_missing_db = tmp_path / "schema_missing.sqlite"
+    with sqlite3.connect(schema_missing_db):
+        pass
+
+    assert load_processed_data(empty_db)["papers"].empty
+    assert load_processed_data(schema_missing_db)["papers"].empty
 
 
 def test_graph_loading_summary_and_tables(tmp_path):
@@ -247,6 +263,106 @@ def test_graph_type_filter_preserves_only_selected_visible_node_types():
     assert _graph_available_node_types(graph) == ["paper", "statement", "method", "result"]
     assert sorted(filtered.nodes()) == ["method:stmt_method", "result:stmt_result"]
     assert list(filtered.edges()) == [("method:stmt_method", "result:stmt_result")]
+
+
+def test_default_graph_node_types_prioritize_semantic_nodes():
+    assert _default_graph_node_types(["paper", "statement", "method", "result"]) == [
+        "method",
+        "result",
+    ]
+    assert _default_graph_node_types(["paper", "statement"]) == ["paper", "statement"]
+
+
+def test_graph_layout_positions_use_type_layers_instead_of_hub_spokes():
+    graph = nx.DiGraph()
+    graph.add_node("paper:paper_001", node_type="paper", paper_id="paper_001")
+    for index in range(3):
+        statement_id = f"stmt_{index}"
+        graph.add_node(
+            f"statement:{statement_id}",
+            node_type="statement",
+            statement_id=statement_id,
+            paper_id="paper_001",
+        )
+        graph.add_edge("paper:paper_001", f"statement:{statement_id}", relation="contains")
+    graph.add_node("method:stmt_method", node_type="method", statement_id="stmt_method")
+    graph.add_node("result:stmt_result", node_type="result", statement_id="stmt_result")
+    graph.add_edge("method:stmt_method", "result:stmt_result", relation="supports")
+
+    positions = _graph_layout_positions(graph)
+
+    assert positions["paper:paper_001"][0] < positions["statement:stmt_0"][0]
+    assert positions["statement:stmt_0"][0] < positions["method:stmt_method"][0]
+    assert positions["method:stmt_method"][0] < positions["result:stmt_result"][0]
+    assert {
+        positions["statement:stmt_0"][0],
+        positions["statement:stmt_1"][0],
+        positions["statement:stmt_2"][0],
+    } == {positions["statement:stmt_0"][0]}
+    assert len({positions[f"statement:stmt_{index}"][1] for index in range(3)}) == 3
+
+
+def test_knowledge_map_model_and_markup_show_professional_overview(tmp_path):
+    db_path = tmp_path / "papers.sqlite"
+    initialize_database(str(db_path))
+    save_paper(str(db_path), "paper_001", "Synthetic Paper", "paper.pdf")
+    save_chunk(str(db_path), "paper_001", "paper_001:chunk_0000", 0, "chunk text", 0, 10)
+    for statement_id, statement_type, text in [
+        ("stmt_method", "method", "A local method is described."),
+        ("stmt_result", "result", "A local result is reported."),
+        ("stmt_limitation", "limitation", "A limitation motivates follow-up work."),
+    ]:
+        save_statement(
+            str(db_path),
+            statement_id,
+            "paper_001",
+            "paper_001:chunk_0000",
+            statement_type,
+            text,
+            text,
+            f"rule:{statement_type}",
+        )
+    data = load_processed_data(db_path)
+    data.update(
+        {
+            "gaps": [{"gap_id": "gap_001", "source_statement_ids": ["stmt_limitation"]}],
+            "hypotheses": [{"hypothesis_id": "hyp_001", "gap_id": "gap_001"}],
+            "experiment_plans": [{"hypothesis_id": "hyp_001", "plan": {}}],
+        }
+    )
+    graph = nx.DiGraph()
+    graph.add_node("method:stmt_method", node_type="method", statement_id="stmt_method")
+    graph.add_node("result:stmt_result", node_type="result", statement_id="stmt_result")
+    graph.add_node(
+        "limitation:stmt_limitation",
+        node_type="limitation",
+        statement_id="stmt_limitation",
+    )
+    graph.add_edge("method:stmt_method", "result:stmt_result", relation="supports")
+    graph.add_edge("result:stmt_result", "limitation:stmt_limitation", relation="limited_by")
+
+    model = _build_knowledge_map_model(data, graph)
+    markup = _knowledge_map_markup(model)
+    node_labels = {node["label"] for node in model["nodes"]}
+    edge_pairs = {(edge["source"], edge["target"]) for edge in model["edges"]}
+
+    assert {
+        "Local papers",
+        "Evidence statements",
+        "Research gaps",
+        "Hypotheses",
+        "Experiment plans",
+    } <= node_labels
+    assert ("limitation", "gaps") in edge_pairs
+    assert ("gaps", "hypotheses") in edge_pairs
+    assert ("hypotheses", "plans") in edge_pairs
+    assert 'class="rn-knowledge-flow"' in markup
+    assert 'class="rn-kg-stage-link"' in markup
+    assert "Extracted research units" in markup
+    assert "classified as" in markup
+    assert "suggests gaps" in markup
+    assert "Local papers &rarr; Evidence statements" in markup
+    assert "A limitation motivates" not in markup
 
 
 def test_graph_relation_filter_preserves_nodes_while_filtering_edges():
@@ -431,6 +547,26 @@ def test_artifact_readiness_flags_missing_and_stale_outputs(tmp_path):
     assert readiness["counts"]["stale"] == 3
     assert "older than input artifact" in reasons["graph"]
     assert "input artifact is missing" in reasons["evaluation"]
+
+
+def test_artifact_readiness_treats_empty_database_as_missing(tmp_path):
+    db_path = tmp_path / "papers.sqlite"
+    db_path.write_bytes(b"")
+
+    readiness = build_artifact_readiness(
+        [
+            {
+                "key": "database",
+                "label": "Database",
+                "path": db_path,
+                "recovery_step": "ingest",
+            },
+        ]
+    )
+
+    assert readiness["status"] == "missing"
+    assert readiness["artifacts"][0]["status"] == "missing"
+    assert readiness["artifacts"][0]["reason"] == "Artifact file is empty."
 
 
 def test_artifact_readiness_summary_keeps_top_status_compact():
